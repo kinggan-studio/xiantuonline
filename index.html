@@ -1,0 +1,3969 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>仙途轮回</title>
+  <style>
+/* 水墨国风 —— 规范见 DESIGN.md。布局按屏幕高度排布，手机上一页看完，不用滚动 */
+:root {
+  --paper: #f4ecd8;
+  --paper-2: #ece1c6;
+  --paper-3: #e3d6b6;
+  --ink: #1f1b16;
+  --ink-2: #4a4238;
+  --ink-3: #8a7f6e;
+  --line: #c9bb9a;
+  --line-soft: #dccfb0;
+  --cinnabar: #b83a2e;
+  --cinnabar-2: #d24a3b;
+  --jade: #3f7563;
+  --gold: #a8842f;
+  --glow: rgba(255, 255, 255, 0.55);
+  /* 装备品质：白、绿、蓝、紫、黄、橙 */
+  --r-common: #4a4238;
+  --r-uncommon: #2e7d4f;
+  --r-rare: #2f6db0;
+  --r-epic: #7b4fa8;
+  --r-legendary: #a8840a;
+  --r-mythic: #d2561a;
+  --panel-shadow: inset 0 0 0 3px var(--paper-2), inset 0 0 0 4px var(--line-soft), 0 2px 10px rgba(60, 40, 10, 0.14);
+  --font: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  /* 远山剪影（纯 CSS 背景，无图片文件） */
+  --mountain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 200' preserveAspectRatio='none'><path d='M0 200V120C60 90 110 60 170 95C230 130 270 70 340 60C410 50 450 100 520 90C590 80 640 40 710 70C760 90 790 100 800 105V200Z' fill='%231f1b16' fill-opacity='.06'/><path d='M0 200V150C80 130 140 160 220 140C300 120 380 160 470 145C560 130 650 150 800 130V200Z' fill='%231f1b16' fill-opacity='.08'/></svg>");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #17130f;
+    --paper-2: #221d17;
+    --paper-3: #1c1812;
+    --ink: #eadfc6;
+    --ink-2: #c4b89c;
+    --ink-3: #8a7f6e;
+    --line: #3e362b;
+    --line-soft: #2d271f;
+    --cinnabar: #d4503f;
+    --cinnabar-2: #e56a58;
+    --jade: #5a9a85;
+    --gold: #c9a54c;
+    --glow: rgba(201, 165, 76, 0.09);
+    --r-common: #e8e2d4;
+    --r-uncommon: #5fb283;
+    --r-rare: #6aa6e0;
+    --r-epic: #b58ae0;
+    --r-legendary: #e6c34a;
+    --r-mythic: #ff8c42;
+    --panel-shadow: inset 0 0 0 3px var(--paper-2), inset 0 0 0 4px var(--line-soft), 0 2px 12px rgba(0, 0, 0, 0.5);
+    --mountain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 200' preserveAspectRatio='none'><path d='M0 200V120C60 90 110 60 170 95C230 130 270 70 340 60C410 50 450 100 520 90C590 80 640 40 710 70C760 90 790 100 800 105V200Z' fill='%23eadfc6' fill-opacity='.035'/><path d='M0 200V150C80 130 140 160 220 140C300 120 380 160 470 145C560 130 650 150 800 130V200Z' fill='%23eadfc6' fill-opacity='.045'/></svg>");
+  }
+}
+
+* { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--ink-3) transparent; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    var(--mountain),
+    radial-gradient(ellipse at 50% 0%, var(--glow), transparent 55%),
+    radial-gradient(rgba(120, 100, 60, 0.07) 1px, transparent 1px),
+    radial-gradient(rgba(120, 100, 60, 0.05) 1px, transparent 1px);
+  background-repeat: no-repeat, no-repeat, repeat, repeat;
+  background-size: 100% 200px, 100% 100%, 23px 23px, 37px 37px;
+  background-position: bottom center, 0 0, 0 0, 11px 17px;
+  overflow: hidden;
+}
+
+/* 四周淡淡的暗角，像旧宣纸的边缘 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(60, 40, 10, 0.12) 100%);
+  z-index: 0;
+}
+
+/* 整屏外壳：占满可视高度（dvh 避开手机地址栏） */
+#app { height: 100vh; height: 100dvh; max-width: 560px; margin: 0 auto; position: relative; z-index: 1; }
+.shell { height: 100%; }
+.screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  overflow-y: auto; /* 仅在屏幕极矮、放不下时兜底滚动 */
+  overscroll-behavior: contain;
+}
+
+h1, h2, h3, p { margin: 0; }
+
+/* 顶栏：印章标识 + 标题 */
+.topbar { display: flex; align-items: center; justify-content: space-between; flex: none; }
+.brand { display: flex; align-items: center; font-size: 22px; font-weight: 700; letter-spacing: 0.3em; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+.brand::before {
+  content: "仙";
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 10px;
+  background: linear-gradient(160deg, var(--cinnabar-2), var(--cinnabar));
+  color: #fff6e6;
+  font-size: 17px;
+  letter-spacing: 0;
+  border-radius: 3px;
+  transform: rotate(-5deg);
+  box-shadow: 0 2px 5px rgba(184, 58, 46, 0.4), inset 0 0 0 2px rgba(255, 246, 230, 0.25);
+  text-shadow: none;
+}
+.icon-btn {
+  width: 42px; height: 42px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-3));
+  color: var(--ink);
+  font: inherit; font-size: 18px;
+  border-radius: 50%; cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.1s, border-color 0.2s;
+}
+.icon-btn:active { transform: translateY(1px); }
+@media (hover: hover) { .icon-btn:hover { border-color: var(--cinnabar); } }
+.icon-btn + .icon-btn { margin-left: 8px; }
+
+/* 面板：像一幅小卷轴，双层描边 */
+.panel {
+  flex: none;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-3));
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 10px 12px;
+  box-shadow: var(--panel-shadow);
+}
+.panel > h2 {
+  font-size: 16px;
+  font-weight: 700;
+  border-left: 4px solid var(--cinnabar);
+  padding-left: 8px;
+  margin-bottom: 6px;
+  letter-spacing: 0.12em;
+}
+.muted { color: var(--ink-2); font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row.spread { justify-content: space-between; }
+.row.tight { gap: 4px; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex: 1 1 auto; min-height: 0; }
+
+/* 印章按钮 */
+.seal {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 4px 12px;
+  border: 2px solid var(--cinnabar);
+  background: color-mix(in srgb, var(--cinnabar) 7%, transparent);
+  color: var(--cinnabar);
+  font: inherit;
+  letter-spacing: 0.15em;
+  line-height: 1.25;
+  border-radius: 3px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.1s, background-color 0.2s, filter 0.2s;
+}
+@media (hover: hover) {
+  .seal:hover:not(:disabled) { background: color-mix(in srgb, var(--cinnabar) 16%, transparent); }
+  .seal.primary:hover:not(:disabled) { filter: brightness(1.08); }
+}
+.seal.primary {
+  background: linear-gradient(180deg, var(--cinnabar-2), var(--cinnabar));
+  color: #fff6e6;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 3px 9px rgba(184, 58, 46, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.seal.block { width: 100%; min-height: 54px; font-size: 18px; letter-spacing: 0.4em; }
+.seal:active:not(:disabled) { transform: translateY(1px); }
+.seal:disabled {
+  border-color: var(--ink-3);
+  color: var(--ink-3);
+  background: transparent;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.seal.primary:disabled { background: var(--line); color: var(--ink-3); border-color: var(--line); text-shadow: none; }
+.seal.small { padding: 4px 10px; letter-spacing: 0.08em; font-size: 14px; }
+.seal.on {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jade) 85%, #fff), var(--jade));
+  border-color: var(--jade);
+  color: #f3fff9;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--jade) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.seal .cost { display: block; font-size: 11px; letter-spacing: 0.02em; opacity: 0.85; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* 选择：宗门 3×2 紧凑卡 */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.card {
+  min-height: 54px;
+  padding: 6px 4px;
+  text-align: center;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--paper), var(--paper-2));
+  color: var(--ink);
+  font: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.12s, box-shadow 0.2s, border-color 0.2s;
+}
+@media (hover: hover) { .card:hover { transform: translateY(-1px); border-color: var(--cinnabar); } }
+.card .ico { display: block; font-size: 24px; }
+.card[aria-pressed="true"] {
+  border-color: var(--cinnabar);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cinnabar) 14%, var(--paper)), color-mix(in srgb, var(--cinnabar) 6%, var(--paper-2)));
+  box-shadow: 0 0 0 1px var(--cinnabar), 0 3px 10px color-mix(in srgb, var(--cinnabar) 30%, transparent);
+  color: var(--cinnabar);
+  font-weight: 700;
+}
+.detail { font-size: 13px; color: var(--ink-2); min-height: 3.9em; }
+.detail b { color: var(--ink); }
+
+/* 灵根卡 */
+.root-name { font-size: 20px; font-weight: 700; }
+.q-za { color: var(--ink-3); }
+.q-pu { color: var(--ink); }
+.q-you { color: var(--jade); }
+.q-tian { color: var(--gold); text-shadow: 0 0 8px color-mix(in srgb, var(--gold) 45%, transparent); }
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-2);
+  line-height: 1.55;
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+}
+.tag.bad { border-color: var(--cinnabar); color: var(--cinnabar); }
+.tag.good { border-color: var(--jade); color: var(--jade); }
+.tag.realm { background: linear-gradient(180deg, var(--cinnabar-2), var(--cinnabar)); border-color: var(--cinnabar); color: #fff6e6; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; }
+.synergy { font-size: 13px; color: var(--jade); }
+
+/* 墨迹条：标签 | 条 | 数值，单行 */
+.meter { display: grid; grid-template-columns: 2.4em 1fr auto; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); margin: 3px 0; }
+.track { height: 10px; background: color-mix(in srgb, var(--line) 70%, transparent); border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25); }
+.fill { position: relative; height: 100%; border-radius: 5px; transition: width 0.3s; }
+.fill::after { content: ""; position: absolute; inset: 0 0 55% 0; border-radius: 5px; background: linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0)); }
+.fill.hp { background: linear-gradient(90deg, #8f2a20, var(--cinnabar) 55%, #e0624f); }
+.fill.mp { background: linear-gradient(90deg, #2c5a4b, var(--jade) 55%, #7bbfa7); }
+.fill.xp { background: linear-gradient(90deg, #7d6220, var(--gold)); }
+.fill.low { animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { filter: brightness(1.45); } }
+.grow-btn { flex: 1; }
+.val { min-width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 探索 */
+.status-title { font-size: 18px; font-weight: 700; }
+.skill-line { font-size: 13px; line-height: 1.45; margin: 2px 0; }
+.skill-line b { color: var(--cinnabar); }
+.notice {
+  flex: none;
+  color: var(--ink-2);
+  font-size: 14px;
+  border-left: 3px solid var(--gold);
+  padding: 2px 8px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 16%, transparent), transparent 80%);
+}
+.error { color: var(--cinnabar); font-size: 14px; }
+
+/* 战斗 */
+.enemy-row { display: grid; grid-template-columns: 60px 1fr; gap: 10px; align-items: center; }
+.enemy-row .face {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  line-height: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--paper), var(--paper-3));
+  border: 2px solid var(--cinnabar);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22), inset 0 0 0 3px var(--paper-2);
+}
+.enemy-row .ename { font-size: 17px; font-weight: 700; }
+.panel.enemy-row.boss { border-color: var(--cinnabar); box-shadow: var(--panel-shadow), 0 0 0 1px var(--cinnabar), 0 0 18px color-mix(in srgb, var(--cinnabar) 40%, transparent); }
+.panel.enemy-row.trial { border-color: var(--gold); box-shadow: var(--panel-shadow), 0 0 0 1px var(--gold), 0 0 16px color-mix(in srgb, var(--gold) 35%, transparent); }
+.face.hit { animation: shake 0.35s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px) rotate(-5deg); }
+  40% { transform: translateX(5px) rotate(5deg); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.panel.hurt { animation: hurt 0.4s; }
+@keyframes hurt {
+  0% { box-shadow: var(--panel-shadow), 0 0 0 2px var(--cinnabar), 0 0 16px color-mix(in srgb, var(--cinnabar) 70%, transparent); }
+  100% { box-shadow: var(--panel-shadow); }
+}
+.log {
+  flex: 1 1 80px;
+  min-height: 72px;
+  overflow-y: auto;
+  padding: 6px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.12);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.ln { padding: 1px 0; }
+.ln.damage { color: var(--cinnabar); }
+.ln.heal, .ln.mp, .ln.shield, .ln.buff { color: var(--jade); }
+.ln.info, .ln.cast { color: var(--ink-2); }
+.ln.end, .ln.crit { font-weight: 700; }
+.gold, .ln.gold { color: var(--gold); font-weight: 700; }
+.ln.head { color: var(--gold); font-weight: 700; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 4px; letter-spacing: 0.06em; }
+.ln.head:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
+
+/* 装备品质：名字着色 + 同色边框；列表行左侧有品质色条 */
+.r-common { color: var(--r-common); }
+.r-uncommon { color: var(--r-uncommon); }
+.r-rare { color: var(--r-rare); }
+.r-epic { color: var(--r-epic); }
+.r-legendary { color: var(--r-legendary); }
+.r-mythic { color: var(--r-mythic); }
+.gear-name {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  font-weight: 700;
+  line-height: 1.55;
+  white-space: nowrap;
+}
+.r-legendary.gear-name, .r-mythic.gear-name { box-shadow: 0 0 8px color-mix(in srgb, currentColor 40%, transparent); }
+.rar-common { --rc: var(--r-common); }
+.rar-uncommon { --rc: var(--r-uncommon); }
+.rar-rare { --rc: var(--r-rare); }
+.rar-epic { --rc: var(--r-epic); }
+.rar-legendary { --rc: var(--r-legendary); }
+.rar-mythic { --rc: var(--r-mythic); }
+
+.item-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.item-row:last-child { border-bottom: 0; }
+.item-row[class*="rar-"] {
+  border-left: 4px solid var(--rc);
+  border-radius: 4px;
+  padding: 6px 6px 6px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rc) 30%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rc) 14%, transparent), transparent 70%);
+}
+.item-row.sold { opacity: 0.5; }
+.item-info { flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 1.4; }
+.item-info .muted { font-size: 12px; }
+.item-row .seal { flex: none; min-width: 60px; }
+.shop { overflow-y: auto; min-height: 0; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tab {
+  flex: 1; min-height: 44px; border: 0; border-bottom: 3px solid transparent;
+  background: transparent; color: var(--ink-2); font: inherit; cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab[aria-selected="true"] { color: var(--cinnabar); border-bottom-color: var(--cinnabar); font-weight: 700; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex: none; }
+.actions .seal { min-width: 0; padding: 4px 6px; letter-spacing: 0.08em; min-height: 48px; }
+select {
+  min-height: 40px;
+  font: inherit;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 6px;
+}
+
+/* 弹窗（行囊、说明、菜单、存档码、结局） */
+.modal {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px;
+  background: rgba(10, 8, 5, 0.62);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.sheet {
+  width: 100%; max-width: 520px;
+  max-height: 90vh; max-height: 90dvh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, var(--paper), var(--paper-2));
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--cinnabar);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 3px var(--paper), inset 0 0 0 4px var(--line-soft), 0 14px 44px rgba(0, 0, 0, 0.45);
+  padding: 14px 16px;
+}
+.sheet h2 { font-size: 18px; border-left: 4px solid var(--cinnabar); padding-left: 8px; margin-bottom: 10px; letter-spacing: 0.12em; }
+.sheet h3 { font-size: 15px; margin: 12px 0 4px; color: var(--cinnabar); letter-spacing: 0.08em; }
+.sheet p { margin: 4px 0; font-size: 14px; }
+.sheet li { font-size: 14px; margin: 3px 0; }
+.sheet ul { margin: 0; padding-left: 1.2em; }
+.sheet .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.menu-list { display: grid; gap: 8px; }
+.screen.demon .brand { color: var(--cinnabar); }
+.screen.demon { background: radial-gradient(ellipse at top, rgba(184, 58, 46, 0.2), transparent 62%); }
+a.seal.link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; margin-top: 4px; }
+textarea.code {
+  width: 100%;
+  min-height: 110px;
+  padding: 8px;
+  font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <noscript>请开启 JavaScript 后再游玩《仙途轮回》。</noscript>
+  <script>
+(function () {
+'use strict';
+const __defs = {
+"main.js": function () {
+const { createRng } = __req("engine/rng.js");
+const { createNewRun, createEnemy, resetForBattle, recoverAfterBattle, walkRegen, restAtCamp, rollRoot, appendJournal, recomputePlayer } = __req("engine/state.js");
+const { pickEvent } = __req("engine/scheduler.js");
+const { loadGame, saveGame, clearRun, exportCode, importCode } = __req("engine/save.js");
+const { equipItem, unequipItem, toggleLoadout } = __req("engine/inventory.js");
+const { rollRewards, rollChest, applyRewards } = __req("engine/rewards.js");
+const { generateShop, buyFromShop } = __req("engine/shop.js");
+const { atGate, syncRealm, advancePastGate, createBoss } = __req("engine/progress.js");
+const { generateEquipment } = __req("engine/loot.js");
+const { createTrialEnemy, createFinalBoss, enterDemon, leaveDemon: leaveDemonState, clearTrial, canSummon, trialCleared, demonRewards, trialById, defeatInDemon } = __req("engine/demon.js");
+const { SHARDS_NEEDED } = __req("data/demon.js");
+const { bandAt } = __req("engine/world.js");
+const { createBattle, step } = __req("combat/battle.js");
+const { chooseAutoAction } = __req("combat/autoplay.js");
+const { useItem } = __req("combat/skills.js");
+const { EVENTS } = __req("data/regions.js");
+const { ITEMS } = __req("data/items.js");
+const { growth } = __req("data/equipment.js");
+const { realmName } = __req("data/realms.js");
+const { mount } = __req("ui/dom.js");
+const { renderApp } = __req("ui/screens.js");
+
+function getStorage() {
+  try {
+    const s = window.localStorage;
+    s.setItem('xiantu:probe', '1');
+    s.removeItem('xiantu:probe');
+    return s;
+  } catch {
+    const m = new Map();
+    return {
+      volatile: true,
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: (k) => m.delete(k),
+    };
+  }
+}
+
+const randomSeed = () => (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+const freshSelection = (unlocks) => ({ sectId: null, root: rollRoot(createRng(randomSeed()), unlocks), rerolls: 0 });
+const SPEEDS = [1, 3, 10]; // 自动历练的倍速
+
+const storage = getStorage();
+const loaded = loadGame(storage);
+// 读取后补算派生数据（属性、机制、擅长标签），旧存档也能得到新字段
+if (loaded.save.run) recomputePlayer(loaded.save.run.player);
+const startScreen = (save) => (save.run ? (save.run.shop ? 'shop' : save.run.demon && save.run.demon.inside ? 'demon' : 'explore') : 'select');
+
+const app = {
+  screen: startScreen(loaded.save),
+  save: loaded.save,
+  battle: null,
+  rng: null,
+  auto: false, // 自动战斗
+  autoExplore: false, // 自动历练（自动前进 + 自动战斗）
+  speed: 0, // SPEEDS 的下标
+  autoConfig: { skillOrder: [], pillHpThreshold: 0.3 },
+  selection: freshSelection(loaded.save.meta.unlocks),
+  recovered: null,
+  rewardText: '',
+  shopMsg: '',
+  notice: loaded.error
+    ? `存档读取失败：${loaded.error}。原存档没有被覆盖，你可以先导出它再开始新修行。`
+    : storage.volatile ? '当前浏览器禁止本地存储，进度不会保留，请先导出存档码。' : '',
+  dialog: null,
+};
+let autoTimer = null;
+let exploreTimer = null;
+const delay = (ms) => Math.max(15, Math.round(ms / SPEEDS[app.speed]));
+
+function persist() {
+  if (app.rng && app.save.run) app.save.run.rngState = app.rng.getState();
+  try {
+    app.save = saveGame(storage, app.save);
+  } catch (e) {
+    app.notice = `存档失败：${e.message}`;
+  }
+}
+
+function render() {
+  mount(document.getElementById('app'), renderApp(app, actions));
+  const log = document.querySelector('.log');
+  if (log) log.scrollTop = log.scrollHeight;
+  const sheet = document.querySelector('.sheet');
+  if (sheet && !sheet.contains(document.activeElement)) {
+    const first = sheet.querySelector('button, textarea');
+    if (first) first.focus({ preventScroll: true });
+  }
+}
+
+function scheduleAuto() {
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    if (!app.auto || !app.battle || app.battle.over) return;
+    actions.act(chooseAutoAction(app.battle, app.autoConfig));
+  }, delay(450));
+}
+
+// 背包/商店等对玩家数据的改动后统一存档并重绘
+function commit() {
+  persist();
+  render();
+}
+
+// ---- 自动历练：一个循环推进「前进 → 自动战斗 → 继续」，遇到需要玩家决定的事就暂停 ----
+function stopAutoExplore(msg) {
+  app.autoExplore = false;
+  clearTimeout(exploreTimer);
+  if (msg) app.notice = msg;
+  render();
+}
+
+function scheduleExplore() {
+  clearTimeout(exploreTimer);
+  if (app.autoExplore) exploreTimer = setTimeout(tickExplore, delay(500));
+}
+
+function tickExplore() {
+  if (!app.autoExplore) return;
+  if (app.dialog) { scheduleExplore(); return; } // 开着弹窗时先等着
+  if (app.screen === 'shop') return stopAutoExplore('遇到行商，已暂停自动历练。买完点「告辞」后可以再次开启。');
+  if (app.screen === 'select' || app.screen === 'demon') return stopAutoExplore();
+  if (app.screen === 'battle') {
+    const b = app.battle;
+    if (b.over) {
+      if (b.winner !== 'player') return stopAutoExplore();
+      actions.finish();
+    } else if (!app.auto) {
+      app.auto = true;
+      scheduleAuto();
+    }
+    scheduleExplore();
+    return;
+  }
+  const p = app.save.run.player;
+  if (atGate(app.save.run)) return stopAutoExplore(`已走到「${bandAt(app.save.run.depth).name}」的尽头，要击败首领才能继续。自动历练已暂停，先休整好再点「突破」。`);
+  if (p.hp / p.stats.maxHp < 0.5 && (p.items.hp_pill || 0) > 0) actions.useItemOutside('hp_pill');
+  else if (p.hp / p.stats.maxHp < 0.3) return stopAutoExplore('生命过低且没有回春丹，已暂停自动历练。');
+  actions.explore();
+  scheduleExplore();
+}
+
+const actions = {
+  pickSect(id) { app.selection.sectId = id; render(); },
+  reroll() {
+    app.selection.root = rollRoot(createRng(randomSeed()), app.save.meta.unlocks);
+    app.selection.rerolls += 1;
+    render();
+  },
+  begin() {
+    const { sectId, root } = app.selection;
+    if (!sectId) return;
+    const seed = randomSeed();
+    app.save.run = createNewRun({ sectId, rootId: root.rootId, quality: root.quality, seed });
+    app.rng = createRng(seed);
+    app.notice = '';
+    appendJournal(app.save.run, [{ text: '你踏入青云山脉，修行之路就此开始。', kind: 'info' }]);
+    persist();
+    app.screen = 'explore';
+    render();
+  },
+
+  explore() {
+    const run = app.save.run;
+    if (atGate(run)) return; // 区域尽头：必须先击败首领
+    app.rng = createRng(run.rngState);
+    run.depth += 1;
+    walkRegen(run.player); // 赶路时慢慢恢复一点
+    app.notice = '';
+    // 境界随层数提升：小境界（前期→中期→后期）自动升
+    if (syncRealm(run.player, run.depth) === 'stage') {
+      appendJournal(run, [{ text: `境界提升至「${realmName(run.player.realm, run.player.stage)}」！`, kind: 'gold' }]);
+    }
+    const event = pickEvent(EVENTS, { depth: run.depth }, app.rng);
+    if (event.id === 'battle' || event.id === 'moxiu') {
+      const enemy = createEnemy(app.rng.pick(event.monsters), run.depth);
+      resetForBattle(run.player);
+      app.battle = createBattle({ player: run.player, enemy, rng: app.rng });
+      app.screen = 'battle';
+      render();
+      if (app.auto || app.autoExplore) { app.auto = true; scheduleAuto(); }
+      return;
+    }
+    if (event.id === 'merchant') {
+      run.shop = generateShop(app.rng, run.player);
+      appendJournal(run, [
+        { text: `—— 第 ${run.depth} 层 · 行商 ——`, kind: 'head' },
+        { text: '你在路边遇到一位行商，他摊开了货物。', kind: 'info' },
+      ]);
+      app.shopMsg = '';
+      app.screen = 'shop';
+      commit();
+      return;
+    }
+    if (event.id === 'treasure') {
+      const text = applyRewards(run.player, rollChest(app.rng, run.player));
+      appendJournal(run, [
+        { text: `—— 第 ${run.depth} 层 · 寻宝 ——`, kind: 'head' },
+        { text: '你在路旁发现一只宝箱，打开后——', kind: 'info' },
+        { text, kind: 'gold' },
+      ]);
+      commit();
+      return;
+    }
+    const r = restAtCamp(run.player);
+    appendJournal(run, [
+      { text: `—— 第 ${run.depth} 层 · 营地 ——`, kind: 'head' },
+      { text: `你寻得一处山洞稍作调息，恢复了 ${r.hp} 点生命、${r.mp} 点灵力。`, kind: 'heal' },
+    ]);
+    commit();
+  },
+
+  // ---- 魔界 ----
+  openDemon() {
+    const run = app.save.run;
+    if (!run.demon.inside) {
+      if (!(run.player.keys > 0)) return;
+      if (!window.confirm('进入魔界要消耗一把心魔钥匙。魔界里的试炼比普通战斗更难，不过挑战失败不会死，只是这次没有奖励，并被送出魔界。要进去吗？')) return;
+      enterDemon(run.player, run);
+      appendJournal(run, [{ text: '—— 魔界 ——', kind: 'head' }, { text: '你用心魔钥匙打开了魔界之门，七情心魔在黑暗中等着你。', kind: 'info' }]);
+    }
+    clearTimeout(exploreTimer);
+    app.autoExplore = false;
+    app.screen = 'demon';
+    commit();
+  },
+  startDemonBattle(enemy) {
+    const run = app.save.run;
+    app.rng = createRng(run.rngState);
+    resetForBattle(run.player);
+    app.battle = createBattle({ player: run.player, enemy, rng: app.rng, rule: enemy.rule });
+    app.screen = 'battle';
+    render();
+    if (app.auto) scheduleAuto();
+  },
+  challengeTrial(id) {
+    const run = app.save.run;
+    const trial = trialById(id);
+    if (!trial || trialCleared(run, id)) return;
+    actions.startDemonBattle(createTrialEnemy(trial, run.player));
+  },
+  summonFinal() {
+    const run = app.save.run;
+    if (!canSummon(run)) return;
+    actions.startDemonBattle(createFinalBoss(run.player));
+  },
+  leaveDemon() {
+    const run = app.save.run;
+    leaveDemonState(run);
+    app.screen = 'explore';
+    appendJournal(run, [{ text: '你离开了魔界。', kind: 'info' }]);
+    commit();
+  },
+  onTrialOver() {
+    const b = app.battle;
+    const run = app.save.run;
+    const p = run.player;
+    const e = b.enemy;
+    const lines = [{ text: `—— 魔界 · ${e.name} ——`, kind: 'head' }, ...b.log.map((l) => ({ text: l.text, kind: l.kind, crit: l.crit }))];
+    if (b.winner === 'player') {
+      if (!e.isFinal) clearTrial(run, e.trialId);
+      app.rewardText = applyRewards(p, demonRewards(p, app.rng, !!e.isFinal));
+      app.recovered = recoverAfterBattle(p);
+      if (e.isFinal) {
+        run.demon.won = true;
+        run.demon.inside = false;
+        app.save.meta.endings = (app.save.meta.endings || 0) + 1;
+        app.save.meta.dao = (app.save.meta.dao || 0) + 10;
+        lines.push({ text: `击败了天道代行者！${app.rewardText}`, kind: 'gold' });
+      } else {
+        lines.push({ text: `通过试炼，获得心魔碎片（${run.demon.shards.length}/${SHARDS_NEEDED}）。${app.rewardText}`, kind: 'gold' });
+      }
+      lines.push({ text: `战后调息，恢复了 ${app.recovered.hp} 点生命、${app.recovered.mp} 点灵力。`, kind: 'heal' });
+    } else {
+      // 失败不会死：这次试炼没有奖励，被击退并逃出魔界，生命恢复到 30%
+      const hp = defeatInDemon(run);
+      app.rewardText = '';
+      app.recovered = null;
+      lines.push({ text: `你被${e.name}击退了，这次试炼没有奖励。你勉强逃出魔界，生命只剩 ${hp}。`, kind: 'info' });
+    }
+    appendJournal(run, lines);
+    persist();
+    render();
+  },
+
+  // 挑战区域尽头的首领，突破到下一个大境界。打不过就是死亡，所以可以先休整、换装备再来
+  breakthrough() {
+    const run = app.save.run;
+    if (!atGate(run)) return;
+    clearTimeout(exploreTimer);
+    app.autoExplore = false;
+    app.rng = createRng(run.rngState);
+    const boss = createBoss(run.player.realm);
+    resetForBattle(run.player);
+    app.battle = createBattle({ player: run.player, enemy: boss, rng: app.rng });
+    appendJournal(run, [{ text: `—— 突破 · 挑战「${boss.name}」——`, kind: 'head' }]);
+    app.screen = 'battle';
+    render();
+    if (app.auto) scheduleAuto();
+  },
+
+  buy(index) {
+    const run = app.save.run;
+    const r = buyFromShop(run.player, run.shop, index);
+    app.shopMsg = r.msg;
+    if (r.ok) appendJournal(run, [{ text: `🛒 ${r.msg}`, kind: 'gold' }]);
+    commit();
+  },
+  leaveShop() {
+    const run = app.save.run;
+    run.shop = null;
+    app.shopMsg = '';
+    appendJournal(run, [{ text: '你告别了行商，继续赶路。', kind: 'info' }]);
+    app.screen = 'explore';
+    commit();
+  },
+
+  useItemOutside(id) {
+    const run = app.save.run;
+    app.rng = createRng(run.rngState);
+    const sink = { log: [], rng: app.rng, _depth: 0 };
+    const hp0 = run.player.hp;
+    const mp0 = run.player.mp;
+    if (useItem(sink, run.player, id)) {
+      const dh = run.player.hp - hp0;
+      const dm = run.player.mp - mp0;
+      appendJournal(run, [{
+        text: `你服用了「${ITEMS[id].name}」，` + (dh > 0 ? `恢复 ${dh} 点生命` : dm > 0 ? `恢复 ${dm} 点灵力` : '没有明显效果') + '。',
+        kind: 'heal',
+      }]);
+      persist();
+    }
+    render();
+  },
+
+  act(action) {
+    const b = app.battle;
+    if (!b || b.over) return;
+    const enemyHp = b.enemy.hp;
+    const playerHp = b.player.hp;
+    step(b, action);
+    app.flash = { enemy: b.enemy.hp < enemyHp, player: b.player.hp < playerHp }; // 受击时抖动/闪红，只在这一次渲染里生效
+    render();
+    app.flash = null;
+    if (b.over) actions.onOver();
+    else if (app.auto) scheduleAuto();
+  },
+
+  onOver() {
+    const b = app.battle;
+    clearTimeout(autoTimer);
+    if (b.enemy.isTrial) { actions.onTrialOver(); return; }
+    if (b.winner === 'player') {
+      const run = app.save.run;
+      const p = run.player;
+      run.kills += 1;
+      const lines = [
+        { text: `—— 第 ${run.depth} 层 · ${b.enemy.name}（${b.turn} 回合）——`, kind: 'head' },
+        ...b.log.map((l) => ({ text: l.text, kind: l.kind, crit: l.crit })),
+      ];
+      if (b.enemy.isBoss) {
+        // 击败区域首领：跨进下一个区域（大境界提升），并获得一份厚礼
+        advancePastGate(run);
+        const gift = { gold: Math.round(120 * growth(p.realm)), drops: [{ kind: 'equip', item: generateEquipment(app.rng, p.realm) }] };
+        app.rewardText = `突破成功！进入「${realmName(p.realm, p.stage)}」。${applyRewards(p, gift)}`;
+        app.recovered = { hp: 0, mp: 0 };
+        lines.push({ text: app.rewardText, kind: 'gold' });
+      } else {
+        app.rewardText = applyRewards(p, rollRewards(b.enemy, p, app.rng));
+        app.recovered = recoverAfterBattle(p);
+        lines.push({ text: app.rewardText, kind: 'gold' });
+        lines.push({ text: `战后调息，恢复了 ${app.recovered.hp} 点生命、${app.recovered.mp} 点灵力。`, kind: 'heal' });
+      }
+      appendJournal(run, lines);
+      persist();
+    }
+    render();
+  },
+
+  resultText() {
+    const tb = app.battle;
+    if (tb && tb.enemy.isTrial) {
+      if (tb.winner !== 'player') return '你被击退了，这次试炼没有奖励。你勉强逃出魔界，生命恢复到 30%，不会身死道消。';
+      return `${app.rewardText}。进度已自动保存。`;
+    }
+    if (!app.recovered) return '';
+    if (app.battle && app.battle.enemy.isBoss) return `${app.rewardText}。进度已自动保存。`;
+    return `${app.rewardText}。战后调息，恢复 ${app.recovered.hp} 点生命、${app.recovered.mp} 点灵力。进度已自动保存。`;
+  },
+
+  finish() {
+    const b = app.battle;
+    app.battle = null;
+    app.recovered = null;
+    app.rewardText = '';
+    if (b.enemy.isTrial) {
+      // 魔界战斗：胜利回到魔界（通关后进结局）；失败不会死，被送出魔界回到探索
+      const won = b.winner === 'player';
+      app.screen = won && !b.enemy.isFinal ? 'demon' : 'explore';
+      if (won && b.enemy.isFinal) app.dialog = { type: 'ending' };
+      render();
+      return;
+    }
+    if (b.winner === 'player') {
+      app.screen = 'explore';
+    } else {
+      clearTimeout(exploreTimer);
+      app.autoExplore = false;
+      app.save = clearRun(storage, app.save);
+      app.selection = freshSelection(app.save.meta.unlocks);
+      app.notice = '你已身死道消。带着模糊的记忆，重新踏上仙途吧。';
+      app.screen = 'select';
+    }
+    render();
+  },
+
+  toggleAuto() {
+    app.auto = !app.auto;
+    if (!app.auto && app.autoExplore) { app.autoExplore = false; clearTimeout(exploreTimer); }
+    render();
+    if (app.auto && app.battle && !app.battle.over) scheduleAuto();
+    else clearTimeout(autoTimer);
+  },
+  setPillThreshold(v) { app.autoConfig.pillHpThreshold = v; },
+
+  // 自动历练的开关。战斗中也能开关：关掉后立刻交还手动控制（连带关掉自动战斗），当前这场战斗由你自己打
+  toggleAutoExplore() {
+    app.autoExplore = !app.autoExplore;
+    if (app.autoExplore) {
+      app.notice = '';
+      app.auto = true;
+      render();
+      tickExplore();
+      if (app.battle && !app.battle.over) scheduleAuto();
+    } else {
+      clearTimeout(exploreTimer);
+      if (app.screen === 'battle') {
+        app.auto = false;
+        clearTimeout(autoTimer);
+      }
+      render();
+    }
+  },
+  cycleSpeed() {
+    app.speed = (app.speed + 1) % SPEEDS.length;
+    render();
+  },
+
+  // 行囊
+  openBag() { app.dialog = { type: 'bag', tab: 'equip', msg: '' }; render(); },
+  bagTab(tab) { app.dialog.tab = tab; app.dialog.msg = ''; render(); },
+  equip(id) { app.dialog.msg = equipItem(app.save.run.player, id).msg; commit(); },
+  unequip(slot) { app.dialog.msg = unequipItem(app.save.run.player, slot).msg; commit(); },
+  toggleSkill(id) { app.dialog.msg = toggleLoadout(app.save.run.player, id).msg; commit(); },
+
+  openHelp() { app.dialog = { type: 'help' }; render(); },
+  openMenu() { app.dialog = { type: 'menu' }; render(); },
+  openAbout() { app.dialog = { type: 'about' }; render(); },
+  async openExport() {
+    app.dialog = { type: 'export', code: '正在生成……' };
+    render();
+    app.dialog.code = await exportCode(app.save);
+    render();
+  },
+  openImport() { app.dialog = { type: 'import', text: '', error: '' }; render(); },
+  closeDialog() { app.dialog = null; render(); },
+  async copyCode() {
+    try {
+      await navigator.clipboard.writeText(app.dialog.code);
+      app.dialog.note = '已复制到剪贴板。';
+    } catch {
+      app.dialog.note = '无法自动复制，请长按文本框全选后手动复制。';
+    }
+    render();
+  },
+  async doImport() {
+    try {
+      const imported = await importCode(app.dialog.text);
+      clearTimeout(autoTimer);
+      clearTimeout(exploreTimer);
+      if (imported.run) recomputePlayer(imported.run.player);
+      app.save = imported;
+      persist();
+      app.dialog = null;
+      app.battle = null;
+      app.auto = false;
+      app.autoExplore = false;
+      app.selection = freshSelection(app.save.meta.unlocks);
+      app.screen = startScreen(imported);
+      app.notice = '存档已导入。';
+    } catch (e) {
+      app.dialog.error = e.message;
+    }
+    render();
+  },
+  abandon() {
+    if (!window.confirm('确定放弃本次修行吗？进度将被清除（永久数据保留）。')) return;
+    clearTimeout(autoTimer);
+    clearTimeout(exploreTimer);
+    app.save = clearRun(storage, app.save);
+    app.battle = null;
+    app.auto = false;
+    app.autoExplore = false;
+    app.dialog = null;
+    app.selection = freshSelection(app.save.meta.unlocks);
+    app.notice = '';
+    app.screen = 'select';
+    render();
+  },
+};
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && app.dialog) actions.closeDialog();
+});
+
+render();
+
+return {  };
+},
+"engine/rng.js": function () {
+// 带种子的随机数（mulberry32），保证战斗可复现
+function createRng(seed) {
+  let s = seed >>> 0;
+  function next() {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  return {
+    next,
+    int(min, max) {
+      return min + Math.floor(next() * (max - min + 1));
+    },
+    chance(p) {
+      return next() < p;
+    },
+    pick(arr) {
+      return arr[Math.floor(next() * arr.length)];
+    },
+    getState() {
+      return s;
+    },
+    setState(n) {
+      s = n >>> 0;
+    },
+  };
+}
+
+return { createRng };
+},
+"engine/state.js": function () {
+const { SECTS } = __req("data/sects.js");
+const { ROOTS, QUALITIES, getQuality } = __req("data/roots.js");
+const { MONSTERS } = __req("data/monsters.js");
+const { realmStats } = __req("data/realms.js");
+const { SLOTS, growth, CRIT_CAP } = __req("data/equipment.js");
+const { ENEMY_ATK } = __req("data/world.js");
+const { bandIndexAt, realmFloat, enemyPower } = __req("engine/world.js");
+
+const DEFAULT_ITEMS = { hp_pill: 3, mp_pill: 1 };
+const LOADOUT_MAX = 4; // 武学栏数量
+const START_GOLD = 50;
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+// 刷新灵根：随机一个已解锁的灵根属性 + 一个品质（按权重）
+function rollRoot(rng, unlocks = []) {
+  const pool = Object.values(ROOTS).filter((r) => !r.locked || unlocks.includes(r.id));
+  const root = rng.pick(pool);
+  const total = QUALITIES.reduce((sum, q) => sum + q.weight, 0);
+  let x = rng.next() * total;
+  let quality = QUALITIES[QUALITIES.length - 1];
+  for (const q of QUALITIES) {
+    x -= q.weight;
+    if (x < 0) {
+      quality = q;
+      break;
+    }
+  }
+  return { rootId: root.id, quality: quality.id };
+}
+
+// 境界基础属性 × 宗门 × 灵根（灵根加成按品质倍率缩放）
+function computeStats(realm, stage, sect, root, qualityId = 'pu') {
+  const s = realmStats(realm, stage);
+  const q = getQuality(qualityId).mul;
+  for (const [k, v] of Object.entries(sect.statMul || {})) s[k] *= v;
+  for (const [k, v] of Object.entries(sect.statAdd || {})) s[k] += v;
+  for (const [k, v] of Object.entries(root.statMul || {})) s[k] *= 1 + (v - 1) * q;
+  for (const [k, v] of Object.entries(root.statAdd || {})) s[k] += v * q;
+  for (const k of ['maxHp', 'atk', 'def', 'maxMp', 'spd']) s[k] = Math.round(s[k]);
+  s.crit = Math.round(s.crit * 1000) / 1000;
+  s.critDmg = Math.round(s.critDmg * 1000) / 1000;
+  return s;
+}
+
+// 根据境界、宗门、灵根与已装备的装备，重新计算属性、触发效果、机制数值与擅长标签。
+// 装备/卸下装备、读取旧存档后都要调用。生命上限提高时，当前生命同步提高，不会因换装而"空血"
+function recomputePlayer(p) {
+  const sect = SECTS[p.sectId];
+  const root = ROOTS[p.rootId];
+  const prev = p.stats;
+  const stats = computeStats(p.realm, p.stage, sect, root, p.rootQuality || 'pu');
+  const mods = clone(sect.mods || {});
+  const effects = sect.passive.effects.map(clone);
+  for (const slot of SLOTS) {
+    const it = (p.equipment || {})[slot]; // 装备是随机生成的实例，属性直接存在实例上
+    if (!it) continue;
+    for (const [k, v] of Object.entries(it.stats || {})) stats[k] += v;
+    for (const e of it.effects || []) effects.push(clone(e));
+    for (const [k, v] of Object.entries(it.mods || {})) mods[k] = (mods[k] || 0) + v;
+  }
+  stats.crit = Math.min(CRIT_CAP, Math.round(stats.crit * 1000) / 1000);
+  p.lv = p.realm + Math.log(1 + 0.25 * p.stage) / Math.log(1.7); // 等级：用于把防御按等级归一化
+  p.stats = stats;
+  p.mods = mods;
+  p.effects = effects;
+  p.affinity = sect.affinity;
+  if (prev) {
+    p.hp = Math.min(stats.maxHp, p.hp + Math.max(0, stats.maxHp - prev.maxHp));
+    p.mp = Math.min(stats.maxMp, p.mp + Math.max(0, stats.maxMp - prev.maxMp));
+  }
+  return p;
+}
+
+function createPlayer({ sectId, rootId, quality = 'pu', name = '你' }) {
+  const sect = SECTS[sectId];
+  const root = ROOTS[rootId];
+  if (!sect) throw new Error(`未知宗门: ${sectId}`);
+  if (!root) throw new Error(`未知灵根: ${rootId}`);
+  const items = { ...DEFAULT_ITEMS };
+  for (const [id, n] of Object.entries(sect.startItems || {})) items[id] = (items[id] || 0) + n;
+  const p = {
+    id: 'player',
+    name,
+    side: 'player',
+    icon: sect.icon,
+    sectId,
+    rootId,
+    rootQuality: quality,
+    realm: 0,
+    stage: 0,
+    element: root.element,
+    hp: 0,
+    mp: 0,
+    shield: 0,
+    gold: START_GOLD,
+    skills: [...sect.starterSkills], // 武学栏（已装备的武学）
+    learned: [...sect.starterSkills], // 已学会的全部武学
+    skillLevels: Object.fromEntries(sect.starterSkills.map((id) => [id, 1])), // 武学等级，重复获得会升级
+    equipment: Object.fromEntries(SLOTS.map((s) => [s, null])), // 已穿戴的装备实例（8 个部位）
+    bag: { equipment: [] }, // 未穿戴的装备实例
+    souls: 0,
+    keys: 0, // 心魔钥匙：进入魔界要消耗
+    statuses: [],
+    items,
+    flags: { used: {}, stacks: {} },
+    dead: false,
+  };
+  recomputePlayer(p);
+  p.hp = p.stats.maxHp;
+  p.mp = p.stats.maxMp;
+  return p;
+}
+
+// 生成敌人：depth 为所在层数，数值按深度连续放大，名字随区域变化。depth 缺省为 0（炼气期起点）
+function createEnemy(monsterId, depth = 0) {
+  const m = MONSTERS[monsterId];
+  if (!m) throw new Error(`未知怪物: ${monsterId}`);
+  const f = realmFloat(depth);
+  const k = enemyPower(depth);
+  const g = growth(f);
+  const b = m.stats;
+  const maxMp = Math.round(b.maxMp * (1 + 0.5 * f));
+  const maxHp = Math.round(b.maxHp * k);
+  return {
+    id: m.id,
+    name: (m.names && m.names[bandIndexAt(depth)]) || m.name,
+    side: 'enemy',
+    icon: m.icon,
+    element: m.element,
+    human: !!m.human,
+    lv: f,
+    gold: m.gold ? [Math.round(m.gold[0] * g), Math.round(m.gold[1] * g)] : [0, 0],
+    loot: m.loot ? { ...m.loot } : {},
+    stats: {
+      maxHp, atk: Math.max(1, Math.round(b.atk * k * ENEMY_ATK)), def: Math.round(b.def * k), maxMp,
+      spd: Math.round(b.spd + 2 * f), crit: b.crit, critDmg: b.critDmg,
+    },
+    hp: maxHp,
+    mp: maxMp,
+    shield: 0,
+    skills: [...m.skills],
+    effects: (m.effects || []).map(clone),
+    statuses: [],
+    items: {},
+    flags: { used: {}, stacks: {} },
+    dead: false,
+  };
+}
+
+// 每场战斗开始前清理一次性标记与临时状态（复生等"每场首次"效果、剑意叠层由此重置）
+function resetForBattle(unit) {
+  unit.statuses = [];
+  unit.shield = 0;
+  unit.flags = { used: {}, stacks: {} };
+  unit.dead = false;
+}
+
+function restore(unit, hpPct, mpPct) {
+  const hp0 = unit.hp;
+  const mp0 = unit.mp;
+  unit.hp = Math.min(unit.stats.maxHp, unit.hp + Math.round(unit.stats.maxHp * hpPct));
+  unit.mp = Math.min(unit.stats.maxMp, unit.mp + Math.round(unit.stats.maxMp * mpPct));
+  return { hp: unit.hp - hp0, mp: unit.mp - mp0 };
+}
+
+// 恢复节奏（占最大生命/灵力的比例）。要支撑几千层的长线历练，恢复必须与战斗消耗大致持平
+const REGEN = {
+  battle: [0.25, 0.4], // 战斗胜利后
+  walk: [0.04, 0.08], // 每前进一层（赶路）
+  camp: [0.4, 0.5], // 营地休息
+};
+
+// 战斗胜利后的恢复
+function recoverAfterBattle(unit) {
+  return restore(unit, REGEN.battle[0], REGEN.battle[1]);
+}
+
+// 赶路回复：每前进一层，慢慢恢复一点
+function walkRegen(unit) {
+  return restore(unit, REGEN.walk[0], REGEN.walk[1]);
+}
+
+// 营地休息：恢复更多
+function restAtCamp(unit) {
+  return restore(unit, REGEN.camp[0], REGEN.camp[1]);
+}
+
+// 历练记录：保留最近 max 条，刷新页面后仍在（存在 run.journal 里，旧存档没有则自动补上）
+function appendJournal(run, entries, max = 120) {
+  if (!Array.isArray(run.journal)) run.journal = [];
+  run.journal.push(...entries.map((e) => ({ text: e.text, kind: e.kind || 'info', ...(e.crit ? { crit: true } : {}) })));
+  if (run.journal.length > max) run.journal.splice(0, run.journal.length - max);
+  return run.journal;
+}
+
+function createNewRun({ sectId, rootId, quality = 'pu', seed }) {
+  return {
+    player: createPlayer({ sectId, rootId, quality }),
+    region: 'qingyun',
+    depth: 0,
+    kills: 0,
+    cleared: 0, // 已击败的区域首领数；每击败一个才能进入下一个区域
+    demon: { shards: [], won: false, inside: false }, // 魔界：已通过的试炼（碎片）、是否通关、是否正在魔界里
+    journal: [],
+    shop: null, // 正在逛的商人库存（刷新页面不会重新刷货）
+    rngState: seed >>> 0,
+  };
+}
+
+return { LOADOUT_MAX, START_GOLD, rollRoot, computeStats, recomputePlayer, createPlayer, createEnemy, resetForBattle, REGEN, recoverAfterBattle, walkRegen, restAtCamp, appendJournal, createNewRun };
+},
+"data/sects.js": function () {
+// 宗门：起手武学、属性倾向、擅长类型（affinity）与独门机制（mods + passive.effects）
+// affinity：擅长的武学标签，用该类武学灵力消耗 ×0.8、威力 ×1.15
+// mods：独门机制数值，由战斗/商店/奖励代码读取；passive.effects：挂在单位身上的触发效果
+const SECTS = {
+  sword: {
+    id: 'sword', name: '剑修', icon: '🗡️', affinity: 'jian',
+    desc: '以剑入道，攻击凌厉，剑意不绝。',
+    statMul: { atk: 1.3, maxHp: 1.0 },
+    starterSkills: ['yujian', 'wanjian'],
+    startItems: {},
+    mods: { stackDamage: { intent: 0.06 } },
+    passive: {
+      name: '剑意通明',
+      desc: '连续使用攻击类武学，每次叠 1 层剑意（最多 5 层，每层伤害 +6%）；用辅助武学或丹药清零。击杀回复 20% 灵力',
+      effects: [
+        { on: 'kill', do: { op: 'mp', pct: 0.2 } },
+        { on: 'attack', do: { op: 'stack', key: 'intent', max: 5, label: '剑意' } },
+      ],
+    },
+  },
+  alchemy: {
+    id: 'alchemy', name: '丹修', icon: '⚗️', affinity: 'dan',
+    desc: '以丹养身，持久耐战，身带丹药。',
+    statMul: { maxHp: 1.1 },
+    starterSkills: ['danhuo', 'huiyuan'],
+    startItems: { hp_pill: 2 },
+    mods: { itemPower: 1.5, shopDiscount: 0.9 },
+    passive: {
+      name: '丹气护体',
+      desc: '丹药效果 +50%，商店所有商品 9 折。每回合结束回复 2% 生命',
+      effects: [{ on: 'turnEnd', do: { op: 'heal', pct: 0.02 } }],
+    },
+  },
+  talisman: {
+    id: 'talisman', name: '符修', icon: '📜', affinity: 'fu',
+    desc: '画符御敌，灵力深厚，擅控场。',
+    statMul: { maxMp: 1.2, maxHp: 1.15, atk: 1.15 },
+    starterSkills: ['leifu', 'zhenhun'],
+    startItems: {},
+    mods: { freeCast: { tag: 'fu', chance: 0.25 } },
+    passive: {
+      name: '符意绵长',
+      desc: '符箓类武学有 25% 概率不消耗灵力。每回合开始回复 4% 灵力',
+      effects: [{ on: 'turnStart', do: { op: 'mp', pct: 0.04 } }],
+    },
+  },
+  body: {
+    id: 'body', name: '体修', icon: '💪', affinity: 'ti',
+    desc: '锤炼肉身，生命与防御出众。',
+    statMul: { maxHp: 1.3, def: 1.2, atk: 0.9 },
+    starterSkills: ['bengshan', 'jinzhong'],
+    startItems: {},
+    mods: { lowHp: { below: 0.5, takenMul: 0.8 } },
+    passive: {
+      name: '皮糙肉厚',
+      desc: '生命低于 50% 时受到伤害 -20%，并反震攻击者（攻击力 30%）。受击时 20% 回复 3% 生命',
+      effects: [
+        { on: 'hit', chance: 0.2, do: { op: 'heal', pct: 0.03 } },
+        { on: 'hit', if: { hpBelow: 0.5 }, do: { op: 'damage', pct: 0.3 } },
+      ],
+    },
+  },
+  ghost: {
+    id: 'ghost', name: '鬼修', icon: '👻', affinity: 'gui',
+    desc: '行走阴阳，攻击诡异，一线生机。',
+    statMul: { atk: 1.1, maxHp: 0.9 },
+    starterSkills: ['shihun', 'youming'],
+    startItems: {},
+    mods: { soulAtk: 0.02 },
+    passive: {
+      name: '魂火不灭',
+      desc: '击杀存魂（最多 10），每魂攻击 +2%。每场战斗首次致命伤害时，以 30% 生命复生',
+      effects: [
+        { on: 'kill', do: { op: 'soul', n: 1, max: 10 } },
+        { id: 'ghost_revive', on: 'death', once: true, do: { op: 'revive', pct: 0.3 } },
+      ],
+    },
+  },
+  merchant: {
+    id: 'merchant', name: '商修', icon: '💰', affinity: 'za',
+    desc: '广结善缘，财大气粗，丹药充足。',
+    statMul: { maxHp: 1.2, atk: 1.15, def: 1.1 },
+    starterSkills: ['lingshi', 'zhaocai'],
+    startItems: { hp_pill: 2, mp_pill: 2 },
+    mods: { goldMul: 0.3, shopDiscount: 0.9 },
+    passive: {
+      name: '财大气粗',
+      desc: '金币收入 +30%，商店所有商品 9 折。起手多带 2 颗回春丹和 2 颗聚灵丹',
+      effects: [],
+    },
+  },
+};
+
+return { SECTS };
+},
+"data/roots.js": function () {
+// 灵根品质：决定灵根属性加成的强弱倍率，weight 为刷新时的出现权重
+const QUALITIES = [
+  { id: 'za', name: '杂', mul: 0.5, weight: 25 },
+  { id: 'pu', name: '普', mul: 1, weight: 50 },
+  { id: 'you', name: '优', mul: 1.5, weight: 20 },
+  { id: 'tian', name: '天', mul: 2.2, weight: 5 },
+];
+
+function getQuality(id) {
+  return QUALITIES.find((q) => q.id === id) || QUALITIES[1];
+}
+
+const STAT_LABELS = { maxHp: '生命', atk: '攻击', def: '防御', maxMp: '灵力', spd: '身法', crit: '暴击率', critDmg: '暴击伤害' };
+
+// 把灵根在某品质下的实际加成写成文字，如「攻击 +22%」
+function describeRoot(root, qualityId) {
+  const q = getQuality(qualityId).mul;
+  const parts = [];
+  for (const [k, v] of Object.entries(root.statMul || {})) {
+    const pct = Math.round((v - 1) * q * 100);
+    if (pct !== 0) parts.push(`${STAT_LABELS[k]} ${pct > 0 ? '+' : ''}${pct}%`);
+  }
+  for (const [k, v] of Object.entries(root.statAdd || {})) {
+    const pct = Math.round(v * q * 100);
+    if (pct !== 0) parts.push(`${STAT_LABELS[k]} ${pct > 0 ? '+' : ''}${pct}%`);
+  }
+  return parts.join('，');
+}
+
+// 灵根：决定元素与属性倾向。locked:true 的变异灵根需用道果解锁（子项目⑤）
+const ROOTS = {
+  jin: { id: 'jin', name: '金灵根', element: '金', desc: '锋锐，攻击 +10%', statMul: { atk: 1.1 }, locked: false },
+  mu: { id: 'mu', name: '木灵根', element: '木', desc: '生机，生命 +10%', statMul: { maxHp: 1.1 }, locked: false },
+  shui: { id: 'shui', name: '水灵根', element: '水', desc: '绵长，灵力 +20%', statMul: { maxMp: 1.2 }, locked: false },
+  huo: { id: 'huo', name: '火灵根', element: '火', desc: '炽烈，攻击 +15%，防御 -5%', statMul: { atk: 1.15, def: 0.95 }, locked: false },
+  tu: { id: 'tu', name: '土灵根', element: '土', desc: '厚重，防御 +20%，生命 +5%', statMul: { def: 1.2, maxHp: 1.05 }, locked: false },
+  lei: { id: 'lei', name: '雷灵根', element: '雷', desc: '变异：暴击率 +10%', statAdd: { crit: 0.1 }, locked: true },
+  bing: { id: 'bing', name: '冰灵根', element: '冰', desc: '变异：灵力 +10%，防御 +10%', statMul: { maxMp: 1.1, def: 1.1 }, locked: true },
+  feng: { id: 'feng', name: '风灵根', element: '风', desc: '变异：身法 +25%', statMul: { spd: 1.25 }, locked: true },
+  an: { id: 'an', name: '暗灵根', element: '暗', desc: '变异：暴击伤害 +30%', statAdd: { critDmg: 0.3 }, locked: true },
+};
+
+return { QUALITIES, getQuality, describeRoot, ROOTS };
+},
+"data/monsters.js": function () {
+// 敌人模板（炼气期基础数值）。深度越深，数值按区域放大，名字也随区域变化（names 按区域顺序）
+// gold：击败后的金币区间 [最少, 最多]（炼气期）；loot：各类掉落概率 { equip, skill, item }；human:true 表示魔修（人形敌人）
+const base = { crit: 0.05, critDmg: 1.5 };
+
+const MONSTERS = {
+  qinglin_snake: {
+    id: 'qinglin_snake', name: '青鳞蛇', icon: '🐍', element: '木',
+    names: ['青鳞蛇', '墓中尸蟒', '熔鳞火蟒', '玄水蛟', '云雷蛟', '虚空吞蟒', '太古应龙', '劫雷蛇皇', '仙界蛇神'],
+    stats: { maxHp: 80, atk: 10, def: 3, maxMp: 30, spd: 12, ...base },
+    skills: ['venom'], gold: [4, 8], loot: { item: 0.12 },
+  },
+  shanxiao: {
+    id: 'shanxiao', name: '山魈', icon: '🦍', element: '土',
+    names: ['山魈', '守墓巨猿', '熔岩巨猿', '深海巨灵', '云巅金刚', '虚空魔猿', '太古战猿', '劫雷神猿', '仙界天猿'],
+    stats: { maxHp: 130, atk: 11, def: 8, maxMp: 30, spd: 8, ...base },
+    skills: ['smash'], gold: [6, 10], loot: { item: 0.12 },
+  },
+  chiyan_wolf: {
+    id: 'chiyan_wolf', name: '赤焰狼', icon: '🐺', element: '火',
+    names: ['赤焰狼', '幽冥鬼狼', '熔火炎狼', '龙宫海狼', '九天雷狼', '虚空噬狼', '太古凶狼', '劫雷天狼', '仙界神狼'],
+    stats: { maxHp: 100, atk: 13, def: 4, maxMp: 30, spd: 14, ...base },
+    skills: ['bite', 'flame'], gold: [6, 12], loot: { item: 0.12 },
+  },
+  fugu_kui: {
+    id: 'fugu_kui', name: '腐骨傀', icon: '💀', element: '暗',
+    names: ['腐骨傀', '古墓尸将', '熔岩骷髅', '溺亡水鬼', '云间怨灵', '虚空魔傀', '太古亡灵', '劫雷鬼将', '仙界幽魂'],
+    stats: { maxHp: 110, atk: 12, def: 6, maxMp: 20, spd: 9, ...base },
+    skills: ['bite'], gold: [8, 14], loot: { item: 0.15 },
+  },
+  moxiu_apprentice: {
+    id: 'moxiu_apprentice', name: '魔修学徒', icon: '🥷', element: '暗', human: true,
+    names: ['魔修学徒', '墓中魔修', '熔火魔修', '海魔修', '云魔将', '虚空魔君', '太古魔尊', '劫雷魔皇', '仙界魔神'],
+    stats: { maxHp: 140, atk: 14, def: 7, maxMp: 40, spd: 11, ...base },
+    skills: ['youming', 'flame'], gold: [20, 34], loot: { equip: 0.3, skill: 0.15, item: 0.3 },
+  },
+  moxiu_guard: {
+    id: 'moxiu_guard', name: '魔修护法', icon: '🧙', element: '火', human: true,
+    names: ['魔修护法', '墓府护法', '熔火护法', '龙宫魔使', '云阙魔使', '虚空魔使', '太古魔使', '劫雷魔使', '仙界魔使'],
+    stats: { maxHp: 180, atk: 16, def: 9, maxMp: 40, spd: 10, ...base },
+    skills: ['flame', 'smash'], gold: [28, 46], loot: { equip: 0.4, skill: 0.2, item: 0.3 },
+  },
+};
+
+return { MONSTERS };
+},
+"data/realms.js": function () {
+const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '渡劫'];
+const STAGES = ['前期', '中期', '后期'];
+
+// 境界属性曲线：按境界与阶段给出基础属性，随境界单调递增
+function realmStats(realmIndex, stageIndex) {
+  const k = Math.pow(1.7, realmIndex) * (1 + stageIndex * 0.25);
+  return {
+    maxHp: Math.round(120 * k),
+    atk: Math.round(12 * k),
+    def: Math.round(6 * k),
+    maxMp: Math.round(50 * (1 + realmIndex * 0.5) * (1 + stageIndex * 0.1)),
+    spd: 10 + realmIndex * 2 + stageIndex,
+    crit: 0.05,
+    critDmg: 1.5,
+  };
+}
+
+function realmName(realmIndex, stageIndex) {
+  return REALMS[realmIndex] + STAGES[stageIndex];
+}
+
+return { REALMS, STAGES, realmStats, realmName };
+},
+"data/equipment.js": function () {
+// 装备数据：装备不再是固定数值的条目，而是由「模板 × 品质 × 境界 × 随机浮动」生成的实例（见 engine/loot.js）
+// 这里只放生成所需的规则表：槽位、品质、境界概率表、模板、词条，以及文字描述函数。
+// 8 个装备部位：武器、衣服、护腕、鞋子、护符、玉佩、戒指、项链（每个部位穿一件）
+const SLOTS = ['weapon', 'armor', 'bracer', 'boots', 'talisman', 'jade', 'ring', 'necklace'];
+const SLOT_NAMES = { weapon: '武器', armor: '衣服', bracer: '护腕', boots: '鞋子', talisman: '护符', jade: '玉佩', ring: '戒指', necklace: '项链' };
+const BAG_MAX = 30; // 行囊上限，装不下的新装备自动折算成金币
+const SELL_RATE = 0.35; // 折算金币 = 装备价格 × 35%
+
+// 品质（从低到高）：白、绿、蓝、紫、黄、橙。mul 属性倍率；affixes 特殊词条数量；layers 定价用的「相当于几层历练的金币收入」
+const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+const RARITY_INFO = {
+  common: { name: '白', prefix: '粗制', mul: 1.0, affixes: 0, layers: 8 },
+  uncommon: { name: '绿', prefix: '精制', mul: 1.35, affixes: 0, layers: 22 },
+  rare: { name: '蓝', prefix: '上品', mul: 1.8, affixes: 1, layers: 55 },
+  epic: { name: '紫', prefix: '极品', mul: 2.4, affixes: 1, layers: 140 },
+  legendary: { name: '黄', prefix: '传世', mul: 3.2, affixes: 2, layers: 380 },
+  mythic: { name: '橙', prefix: '无上', mul: 4.3, affixes: 3, layers: 1000 },
+};
+
+// 各境界（炼气→渡劫）出现各品质装备的权重 [白, 绿, 蓝, 紫, 黄, 橙]。境界越高，越容易出好装备
+const RARITY_WEIGHTS = [
+  [88, 11, 1, 0, 0, 0], // 炼气
+  [60, 30, 9, 1, 0, 0], // 筑基
+  [35, 37, 20, 7, 1, 0], // 金丹
+  [18, 30, 30, 16, 5, 1], // 元婴
+  [8, 20, 30, 25, 14, 3], // 化神
+  [3, 8, 20, 28, 28, 13], // 炼虚
+  [1, 5, 13, 24, 30, 27], // 合体
+  [0, 2, 7, 16, 30, 45], // 渡劫
+];
+
+// 属性与价格随境界成长的系数，与敌人/玩家属性曲线（×1.7^境界）一致
+const growth = (realm) => Math.pow(1.7, realm);
+// 炼气期每层历练的期望金币收入。测试会用事件权重和怪物金币核算，必须与数据一致
+const INCOME_PER_LAYER = 9;
+// 武器、衣服属性最强，价格最高；其余六个部位属性较小，价格也低一些
+const SLOT_PRICE_FACTOR = { weapon: 1.1, armor: 1.0, bracer: 0.8, boots: 0.8, talisman: 0.8, jade: 0.8, ring: 0.8, necklace: 0.8 };
+
+// 装备属性的全局系数：8 个部位全部穿满时总属性很可观，所以每件装备的属性整体打折，由模拟器标定
+const GEAR_SCALE = 0.4;
+const CRIT_CAP = 0.75; // 暴击率上限（8 个部位的暴击加成叠起来不能无限高）
+
+// 模板：炼气期、白装、浮动为 1 时的基础属性（再乘 GEAR_SCALE）
+const TEMPLATES = [
+  // 武器
+  { id: 'sword', name: '剑', slot: 'weapon', icon: '🗡️', stats: { atk: 4 } },
+  { id: 'blade', name: '刀', slot: 'weapon', icon: '🔪', stats: { atk: 3, crit: 0.02 } },
+  { id: 'spear', name: '枪', slot: 'weapon', icon: '🔱', stats: { atk: 3, spd: 1 } },
+  // 衣服
+  { id: 'robe', name: '长袍', slot: 'armor', icon: '👘', stats: { maxHp: 25 } },
+  { id: 'leather', name: '皮甲', slot: 'armor', icon: '🥋', stats: { def: 3, maxHp: 12 } },
+  { id: 'plate', name: '铁甲', slot: 'armor', icon: '🛡️', stats: { def: 5 } },
+  // 护腕
+  { id: 'bracer_iron', name: '铁护腕', slot: 'bracer', icon: '🧤', stats: { def: 2, atk: 1 } },
+  { id: 'bracer_leather', name: '皮护腕', slot: 'bracer', icon: '🥊', stats: { atk: 2 } },
+  { id: 'bracer_silk', name: '云纹护腕', slot: 'bracer', icon: '🧤', stats: { maxHp: 12, def: 1 } },
+  // 鞋子
+  { id: 'boots_cloth', name: '布靴', slot: 'boots', icon: '👟', stats: { spd: 2 } },
+  { id: 'boots_leather', name: '皮靴', slot: 'boots', icon: '👢', stats: { spd: 1, maxHp: 10 } },
+  { id: 'boots_war', name: '战靴', slot: 'boots', icon: '🥾', stats: { spd: 1, def: 2 } },
+  // 护符
+  { id: 'charm_peace', name: '平安符', slot: 'talisman', icon: '📜', stats: { maxHp: 12, maxMp: 6 } },
+  { id: 'charm_thunder', name: '雷光符', slot: 'talisman', icon: '🧿', stats: { crit: 0.02, atk: 1 } },
+  { id: 'charm_spirit', name: '灵符', slot: 'talisman', icon: '🔮', stats: { maxMp: 10, def: 1 } },
+  // 玉佩
+  { id: 'jade', name: '玉佩', slot: 'jade', icon: '💎', stats: { maxMp: 12 } },
+  { id: 'jade_warm', name: '暖玉佩', slot: 'jade', icon: '🔹', stats: { maxHp: 12, maxMp: 5 } },
+  { id: 'jade_ice', name: '寒玉佩', slot: 'jade', icon: '❄️', stats: { def: 2, maxMp: 6 } },
+  // 戒指
+  { id: 'ring', name: '戒指', slot: 'ring', icon: '💍', stats: { atk: 1, maxHp: 6 } },
+  { id: 'ring_silver', name: '银戒', slot: 'ring', icon: '⭕', stats: { crit: 0.02, maxHp: 5 } },
+  { id: 'ring_jade', name: '玉戒', slot: 'ring', icon: '🔘', stats: { atk: 1, maxMp: 6 } },
+  // 项链
+  { id: 'pendant', name: '项坠', slot: 'necklace', icon: '🪶', stats: { spd: 1, crit: 0.015 } },
+  { id: 'necklace_bead', name: '珠链', slot: 'necklace', icon: '📿', stats: { maxMp: 8, maxHp: 8 } },
+  { id: 'necklace_fang', name: '兽牙项链', slot: 'necklace', icon: '🦷', stats: { atk: 1, crit: 0.02 } },
+];
+
+// 词条（蓝装及以上）：base 为蓝装的百分数，紫 ×1.5，黄 ×2，橙 ×2.6。build 返回 { effects?, mods? }，desc 为说明
+const AFFIX_SCALE = { rare: 1, epic: 1.5, legendary: 2, mythic: 2.6 };
+const AFFIXES = [
+  {
+    id: 'leech', name: '嗜血', base: 5,
+    build: (pct) => ({ effects: [{ on: 'attack', do: { op: 'heal', pctOfDealt: pct / 100 } }] }),
+    desc: (pct) => `攻击时吸取伤害的 ${pct}% 为生命`,
+  },
+  {
+    id: 'feast', name: '噬魂', base: 6,
+    build: (pct) => ({ effects: [{ on: 'kill', do: { op: 'heal', pct: pct / 100 } }] }),
+    desc: (pct) => `击杀敌人回复 ${pct}% 生命`,
+  },
+  {
+    id: 'wealth', name: '聚财', base: 10,
+    build: (pct) => ({ mods: { goldMul: pct / 100 } }),
+    desc: (pct) => `金币收入 +${pct}%`,
+  },
+  {
+    id: 'focus', name: '凝神', base: 3,
+    build: (pct) => ({ effects: [{ on: 'turnStart', do: { op: 'mp', pct: pct / 100 } }] }),
+    desc: (pct) => `每回合开始回复 ${pct}% 灵力`,
+  },
+  {
+    id: 'thorns', name: '反震', base: 12,
+    build: (pct) => ({ effects: [{ on: 'hit', do: { op: 'damage', pct: pct / 100 } }] }),
+    desc: (pct) => `受击时反震攻击者（攻击力 ${pct}%）`,
+  },
+];
+
+const STAT_LABELS = { maxHp: '生命', atk: '攻击', def: '防御', maxMp: '灵力', spd: '身法', crit: '暴击率' };
+
+// 装备的属性与词条文字，如「攻击 +9 · 暴击率 +5% · 嗜血：攻击时吸取伤害的 5% 为生命」
+function describeItem(item) {
+  const parts = [];
+  for (const [k, v] of Object.entries(item.stats || {})) {
+    parts.push(`${STAT_LABELS[k]} +${k === 'crit' ? `${Math.round(v * 1000) / 10}%` : v}`);
+  }
+  for (const a of item.affixes || []) parts.push(a.name ? `${a.name}：${a.desc}` : a.desc);
+  return parts.join(' · ');
+}
+
+// 带品质的名字，如「[橙]传世剑」
+function itemTitle(item) {
+  return `[${RARITY_INFO[item.rarity].name}]${item.name}`;
+}
+
+return { SLOTS, SLOT_NAMES, BAG_MAX, SELL_RATE, RARITIES, RARITY_INFO, RARITY_WEIGHTS, growth, INCOME_PER_LAYER, SLOT_PRICE_FACTOR, GEAR_SCALE, CRIT_CAP, TEMPLATES, AFFIX_SCALE, AFFIXES, STAT_LABELS, describeItem, itemTitle };
+},
+"data/world.js": function () {
+// 世界：深度分 9 个区域，敌人属性随深度连续增长（每个大境界 ×1.7，与玩家成长曲线一致）
+// from/to 为层数区间；realm 为该区域对应的境界（敌人强度的起点）。最后一个区域无尽，敌人继续变强直到玩家倒下
+const BANDS = [
+  { id: 'qingyun', name: '青云山脉', realm: 0, from: 0, to: 150 },
+  { id: 'youming', name: '幽冥古墓', realm: 1, from: 150, to: 450 },
+  { id: 'rongyan', name: '熔火地脉', realm: 2, from: 450, to: 1000 },
+  { id: 'donghai', name: '东海龙宫', realm: 3, from: 1000, to: 1700 },
+  { id: 'jiutian', name: '九天云阙', realm: 4, from: 1700, to: 2600 },
+  { id: 'xukong', name: '虚空裂隙', realm: 5, from: 2600, to: 3700 },
+  { id: 'taichu', name: '太初古境', realm: 6, from: 3700, to: 5000 },
+  { id: 'dujie', name: '渡劫雷海', realm: 7, from: 5000, to: 6500 },
+  { id: 'xianjie', name: '无尽仙界', realm: 8, from: 6500, to: Infinity },
+];
+
+const ENDLESS_SPAN = 1500; // 无尽区域里每过多少层，敌人强度提高一个大境界
+const ENEMY_ATK = 0.45; // 敌人攻击的全局系数：要连续打几千场，一场战斗只应消耗一部分生命，由模拟器标定
+const ENEMY_EXTRA = 0.30; // 敌人强度额外的线性加成（1 + ENEMY_EXTRA × 境界浮点数），由模拟器调平衡
+
+// 瓶颈首领：每个大境界突破前必须击败。数值是同境界末期普通敌人的数倍
+const BOSS = {
+  icon: '👹',
+  stats: { maxHp: 190, atk: 14, def: 8, maxMp: 60, spd: 12, crit: 0.06, critDmg: 1.5 },
+  skills: ['smash', 'flame'],
+  names: ['心魔', '雷劫化身', '天劫使者', '道则化身', '天道分身', '虚空主宰', '太初古神', '渡劫雷帝'],
+  elements: ['火', '木', '水', '土', '金', '暗', '火', '土'],
+};
+
+return { BANDS, ENDLESS_SPAN, ENEMY_ATK, ENEMY_EXTRA, BOSS };
+},
+"engine/world.js": function () {
+// 世界：由层数得到所在区域、敌人强度（连续增长）
+const { BANDS, ENDLESS_SPAN, ENEMY_EXTRA } = __req("data/world.js");
+const { growth } = __req("data/equipment.js");
+
+function bandIndexAt(depth) {
+  for (let i = 0; i < BANDS.length; i++) if (depth < BANDS[i].to) return i;
+  return BANDS.length - 1;
+}
+
+const bandAt = (depth) => BANDS[bandIndexAt(depth)];
+
+// 层数 → 境界浮点数：区域起点是该区域的境界，走完整个区域则增加 1。无尽区域每 ENDLESS_SPAN 层加 1
+function realmFloat(depth) {
+  const b = bandAt(depth);
+  const span = b.to === Infinity ? ENDLESS_SPAN : b.to - b.from;
+  return b.realm + (depth - b.from) / span;
+}
+
+// 敌人属性（生命、攻击、防御）的放大倍数
+function enemyPower(depth) {
+  const f = realmFloat(depth);
+  return growth(f) * (1 + ENEMY_EXTRA * f);
+}
+
+return { bandIndexAt, bandAt, realmFloat, enemyPower };
+},
+"engine/scheduler.js": function () {
+// 事件调度：按权重在事件表中挑选，when(ctx) 为假的条目被排除
+function pickEvent(table, ctx, rng) {
+  const pool = table.filter((e) => !e.when || e.when(ctx));
+  const total = pool.reduce((sum, e) => sum + e.weight, 0);
+  if (!pool.length || total <= 0) return null;
+  let r = rng.next() * total;
+  for (const e of pool) {
+    r -= e.weight;
+    if (r < 0) return e;
+  }
+  return pool[pool.length - 1];
+}
+
+return { pickEvent };
+},
+"engine/save.js": function () {
+// 存档：单个键，内含版本号；run（本次修行）与 meta（轮回永久数据）分离
+const { legacyToItem, accessorySlotFor } = __req("data/legacyEquipment.js");
+const { SLOTS } = __req("data/equipment.js");
+const { bandIndexAt } = __req("engine/world.js");
+const { realmStageAt } = __req("engine/progress.js");
+
+const SAVE_VERSION = 7;
+const SAVE_KEY = 'xiantu:save';
+
+// MIGRATIONS[n] 把 n 版存档转换为 n+1 版。游戏更新存档结构时在这里追加
+const MIGRATIONS = {
+  // v1 → v2：新增金币、已学武学、装备、行囊、魂。属性、机制等派生数据由 recomputePlayer 在读取后补算
+  1: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player) {
+      const p = out.run.player;
+      if (p.gold === undefined) p.gold = 0;
+      if (!Array.isArray(p.learned)) p.learned = [...(p.skills || [])];
+      if (!p.equipment) p.equipment = { weapon: null, armor: null, accessory: null };
+      if (!p.bag) p.bag = { equipment: [] };
+      if (p.souls === undefined) p.souls = 0;
+      if (out.run.shop === undefined) out.run.shop = null;
+    }
+    return out;
+  },
+  // v2 → v3：装备从固定 id 变成随机生成的实例；武学有了等级。旧装备按原数值转成实例
+  // 旧版行商的库存里是固定 id 的装备，无法沿用，直接作废（下次遇到行商会重新生成）
+  2: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player) {
+      const p = out.run.player;
+      const conv = (v) => (typeof v === 'string' ? legacyToItem(v) : v);
+      if (p.equipment) for (const slot of Object.keys(p.equipment)) p.equipment[slot] = conv(p.equipment[slot]) || null;
+      if (p.bag && Array.isArray(p.bag.equipment)) p.bag.equipment = p.bag.equipment.map(conv).filter(Boolean);
+      if (!p.skillLevels) {
+        p.skillLevels = {};
+        for (const id of p.learned || []) p.skillLevels[id] = 1;
+      }
+      out.run.shop = null;
+    }
+    return out;
+  },
+  // v3 → v4：新增修为（xp）。等级 lv 等派生数据由 recomputePlayer 在读取后补算
+  3: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player && out.run.player.xp === undefined) out.run.player.xp = 0;
+    return out;
+  },
+  // v4 → v5：取消修为，境界完全由层数决定；记录已通关的区域首领数。按层数重算境界，之前走过的区域视为已通关
+  4: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player) {
+      delete out.run.player.xp;
+      const depth = out.run.depth || 0;
+      out.run.cleared = bandIndexAt(depth);
+      const { realm, stage } = realmStageAt(depth);
+      out.run.player.realm = realm;
+      out.run.player.stage = stage;
+    }
+    return out;
+  },
+  // v5 → v6：新增魔界（心魔钥匙、试炼碎片）
+  5: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player) {
+      if (out.run.player.keys === undefined) out.run.player.keys = 0;
+      if (!out.run.demon) out.run.demon = { shards: [], won: false, inside: false };
+    }
+    return out;
+  },
+  // v6 → v7：装备从 3 个部位扩成 8 个。旧的「饰品」按装备类型归到护符、玉佩、戒指、项链；部位冲突的放回行囊
+  6: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player) {
+      const p = out.run.player;
+      const old = p.equipment || {};
+      const eq = Object.fromEntries(SLOTS.map((s) => [s, null]));
+      if (!p.bag) p.bag = { equipment: [] };
+      if (!Array.isArray(p.bag.equipment)) p.bag.equipment = [];
+      for (const [slot, item] of Object.entries(old)) {
+        if (!item) continue;
+        const target = SLOTS.includes(slot) ? slot : accessorySlotFor(item);
+        if (eq[target]) {
+          item.slot = target;
+          p.bag.equipment.push(item);
+        } else {
+          item.slot = target;
+          eq[target] = item;
+        }
+      }
+      for (const item of p.bag.equipment) if (!SLOTS.includes(item.slot)) item.slot = accessorySlotFor(item);
+      p.equipment = eq;
+      if (Array.isArray(out.run.shop)) {
+        for (const e of out.run.shop) if (e.kind === 'equip' && !SLOTS.includes(e.item.slot)) e.item.slot = accessorySlotFor(e.item);
+      }
+    }
+    return out;
+  },
+};
+
+function createNewMeta() {
+  return { dao: 0, codex: [], achievements: [], unlocks: [], rebirths: 0, endings: 0 };
+}
+
+function createNewSave() {
+  return { version: SAVE_VERSION, savedAt: 0, run: null, meta: createNewMeta() };
+}
+
+function migrate(save, migrations = MIGRATIONS, target = SAVE_VERSION) {
+  let cur = { ...save };
+  let v = cur.version ?? 0;
+  if (v > target) throw new Error('存档版本高于游戏版本，请更新游戏后再读取');
+  while (v < target) {
+    const fn = migrations[v];
+    if (!fn) throw new Error(`缺少 v${v} 的存档迁移函数`);
+    cur = fn(cur);
+    v += 1;
+    cur.version = v;
+  }
+  cur.meta = { ...createNewMeta(), ...(cur.meta || {}) };
+  if (cur.run === undefined) cur.run = null;
+  return cur;
+}
+
+function saveGame(storage, save) {
+  const out = { ...save, version: SAVE_VERSION, savedAt: Date.now() };
+  storage.setItem(SAVE_KEY, JSON.stringify(out));
+  return out;
+}
+
+// 返回 { save, error }：存档损坏时给出全新存档并附带错误信息，不会擅自覆盖旧数据
+function loadGame(storage) {
+  const raw = storage.getItem(SAVE_KEY);
+  if (!raw) return { save: createNewSave(), error: null };
+  try {
+    return { save: migrate(JSON.parse(raw)), error: null };
+  } catch (e) {
+    return { save: createNewSave(), error: e.message };
+  }
+}
+
+// 轮回/放弃本次修行：只清 run，保留 meta
+function clearRun(storage, save) {
+  return saveGame(storage, { ...save, run: null });
+}
+
+// ---- 导出 / 导入码：JSON → deflate → base64，附校验和 ----
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+async function pipe(bytes, stream) {
+  const writer = stream.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  return new Uint8Array(await new Response(stream.readable).arrayBuffer());
+}
+
+function toBase64(bytes) {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+function fromBase64(str) {
+  const s = atob(str);
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+
+async function exportCode(save) {
+  const json = JSON.stringify(save);
+  const packed = await pipe(new TextEncoder().encode(json), new CompressionStream('deflate-raw'));
+  return `XT1.${fnv1a(json)}.${toBase64(packed)}`;
+}
+
+async function importCode(code) {
+  const parts = String(code).replace(/\s+/g, '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'XT1') throw new Error('导入码格式不正确');
+  let json;
+  try {
+    const raw = await pipe(fromBase64(parts[2]), new DecompressionStream('deflate-raw'));
+    json = new TextDecoder().decode(raw);
+  } catch {
+    throw new Error('导入码已损坏');
+  }
+  if (fnv1a(json) !== parts[1]) throw new Error('导入码校验失败，内容可能被改动');
+  return migrate(JSON.parse(json));
+}
+
+return { SAVE_VERSION, SAVE_KEY, MIGRATIONS, createNewMeta, createNewSave, migrate, saveGame, loadGame, clearRun, exportCode, importCode };
+},
+"data/legacyEquipment.js": function () {
+// 旧版本（存档版本 2）的固定装备表，仅用于把旧存档里的装备 id 迁移成新的装备实例，游戏本身不再使用
+const LEGACY_EQUIPMENT = {
+  iron_sword: { name: '铁剑', slot: 'weapon', icon: '🗡️', rarity: 'common', price: 60, stats: { atk: 4 } },
+  qinggang: { name: '青钢剑', slot: 'weapon', icon: '⚔️', rarity: 'uncommon', price: 180, stats: { atk: 9 } },
+  pojun: { name: '破军枪', slot: 'weapon', icon: '🔱', rarity: 'rare', price: 420, stats: { atk: 15, crit: 0.05 } },
+  cloth_robe: { name: '布衣', slot: 'armor', icon: '👕', rarity: 'common', price: 50, stats: { maxHp: 25 } },
+  leather: { name: '皮甲', slot: 'armor', icon: '🥋', rarity: 'uncommon', price: 150, stats: { def: 4, maxHp: 30 } },
+  xuantie: { name: '玄铁甲', slot: 'armor', icon: '🛡️', rarity: 'rare', price: 400, stats: { def: 9, maxHp: 60 } },
+  lingyu: { name: '灵玉佩', slot: 'accessory', icon: '📿', rarity: 'common', price: 90, stats: { maxMp: 20 } },
+  jubao: {
+    name: '聚宝囊', slot: 'accessory', icon: '👝', rarity: 'uncommon', price: 170,
+    mods: { goldMul: 0.2 }, affixes: [{ name: '聚财', desc: '金币收入 +20%' }],
+  },
+  fengzhui: { name: '疾风坠', slot: 'accessory', icon: '🪶', rarity: 'uncommon', price: 200, stats: { spd: 4, crit: 0.05 } },
+  xuezhu: {
+    name: '吸血珠', slot: 'accessory', icon: '🔴', rarity: 'rare', price: 320,
+    effects: [{ on: 'attack', do: { op: 'heal', pctOfDealt: 0.08 } }], affixes: [{ name: '嗜血', desc: '攻击时吸取伤害的 8% 为生命' }],
+  },
+  longxue: {
+    name: '龙血石', slot: 'accessory', icon: '🐉', rarity: 'rare', price: 380,
+    effects: [{ on: 'kill', do: { op: 'heal', pct: 0.12 } }], affixes: [{ name: '噬魂', desc: '击杀敌人回复 12% 生命' }],
+  },
+};
+
+// 把旧装备 id 转成新的装备实例（数值保持旧版不变，不再随机）
+function legacyToItem(id) {
+  const t = LEGACY_EQUIPMENT[id];
+  if (!t) return null;
+  return {
+    uid: `legacy_${id}`,
+    tpl: 'legacy',
+    name: t.name,
+    icon: t.icon,
+    slot: t.slot,
+    rarity: t.rarity,
+    realm: 0,
+    stats: { ...(t.stats || {}) },
+    effects: JSON.parse(JSON.stringify(t.effects || [])),
+    mods: { ...(t.mods || {}) },
+    affixes: JSON.parse(JSON.stringify(t.affixes || [])),
+    price: t.price,
+  };
+}
+
+// 旧版有一个「饰品」部位，现在拆成护符、玉佩、戒指、项链。按装备模板（或旧装备名字）判断它该去哪个部位
+const ACCESSORY_BY_TPL = { jade: 'jade', pendant: 'necklace', ring: 'ring' };
+const ACCESSORY_BY_NAME = { '灵玉佩': 'jade', '聚宝囊': 'talisman', '疾风坠': 'necklace', '吸血珠': 'ring', '龙血石': 'ring' };
+function accessorySlotFor(item) {
+  return ACCESSORY_BY_TPL[item.tpl] || ACCESSORY_BY_NAME[item.name] || 'talisman';
+}
+
+return { LEGACY_EQUIPMENT, legacyToItem, accessorySlotFor };
+},
+"engine/progress.js": function () {
+// 成长：境界完全由层数决定（层数 = 境界）。每个区域对应一个大境界，区域内每走过三分之一是一个小境界。
+// 区域的最后一层是关卡：必须击败瓶颈首领，才能进入下一个区域（下一个大境界）。
+const { BANDS, BOSS, ENEMY_ATK, ENEMY_EXTRA } = __req("data/world.js");
+const { REALMS } = __req("data/realms.js");
+const { growth } = __req("data/equipment.js");
+const { recomputePlayer } = __req("engine/state.js");
+const { bandIndexAt } = __req("engine/world.js");
+
+const MAX_REALM = REALMS.length - 1; // 渡劫；之后的无尽仙界境界不再提升
+
+// 层数 → 大境界与小境界（0 前期 / 1 中期 / 2 后期）
+function realmStageAt(depth) {
+  const i = bandIndexAt(depth);
+  if (i > MAX_REALM) return { realm: MAX_REALM, stage: 2 };
+  const b = BANDS[i];
+  const stage = Math.min(2, Math.floor(((depth - b.from) * 3) / (b.to - b.from)));
+  return { realm: b.realm, stage };
+}
+
+// 是否正站在区域尽头：下一步就要跨进新区域，而当前区域的首领还没击败
+function atGate(run) {
+  const i = bandIndexAt(run.depth);
+  const b = BANDS[i];
+  return b.to !== Infinity && run.depth + 1 >= b.to && (run.cleared || 0) <= i;
+}
+
+// 让玩家的境界与当前层数一致。返回 'realm'（大境界提升）、'stage'（小境界提升）或 null
+function syncRealm(p, depth) {
+  const { realm, stage } = realmStageAt(depth);
+  if (realm === p.realm && stage === p.stage) return null;
+  const bigUp = realm > p.realm;
+  p.realm = realm;
+  p.stage = stage;
+  recomputePlayer(p);
+  if (bigUp) {
+    p.hp = p.stats.maxHp;
+    p.mp = p.stats.maxMp;
+  }
+  return bigUp ? 'realm' : 'stage';
+}
+
+// 击败区域首领：记一次通关，向前跨进下一个区域，境界随之提升
+function advancePastGate(run) {
+  run.cleared = (run.cleared || 0) + 1;
+  run.depth += 1;
+  return syncRealm(run.player, run.depth);
+}
+
+// 瓶颈首领：强度相当于下一个境界起点的普通敌人，但生命、攻击高得多
+function createBoss(realm) {
+  const f = realm + 1;
+  const k = growth(f) * (1 + ENEMY_EXTRA * f);
+  const s = BOSS.stats;
+  return {
+    id: `boss_${realm}`,
+    name: BOSS.names[Math.min(realm, BOSS.names.length - 1)],
+    side: 'enemy',
+    icon: BOSS.icon,
+    element: BOSS.elements[Math.min(realm, BOSS.elements.length - 1)],
+    isBoss: true,
+    human: false,
+    lv: f,
+    gold: [0, 0],
+    loot: {},
+    stats: {
+      maxHp: Math.round(s.maxHp * k), atk: Math.max(1, Math.round(s.atk * k * ENEMY_ATK)), def: Math.round(s.def * k),
+      maxMp: Math.round(s.maxMp * (1 + 0.5 * f)), spd: Math.round(s.spd + 2 * f), crit: s.crit, critDmg: s.critDmg,
+    },
+    hp: Math.round(s.maxHp * k),
+    mp: Math.round(s.maxMp * (1 + 0.5 * f)),
+    shield: 0,
+    skills: [...BOSS.skills],
+    effects: [],
+    statuses: [],
+    items: {},
+    flags: { used: {}, stacks: {} },
+    dead: false,
+  };
+}
+
+return { MAX_REALM, realmStageAt, atGate, syncRealm, advancePastGate, createBoss };
+},
+"engine/inventory.js": function () {
+// 行囊：装备的穿脱、武学栏的装卸、学会/升级武学。都直接修改 player 并返回结果
+const { SKILLS, SKILL_MAX_LEVEL, SKILL_MAXED_REFUND } = __req("data/skills.js");
+const { BAG_MAX, growth } = __req("data/equipment.js");
+const { LOADOUT_MAX, recomputePlayer } = __req("engine/state.js");
+const { sellValue } = __req("engine/loot.js");
+
+const skillLevel = (p, id) => (p.skillLevels && p.skillLevels[id]) || (p.learned.includes(id) ? 1 : 0);
+const bagFull = (p) => p.bag.equipment.length >= BAG_MAX;
+
+// 装备放进行囊；行囊满了就自动折算成金币
+function addToBag(p, item) {
+  if (bagFull(p)) {
+    const gold = sellValue(item);
+    p.gold += gold;
+    return { stored: false, gold };
+  }
+  p.bag.equipment.push(item);
+  return { stored: true, gold: 0 };
+}
+
+function equipItem(p, uid) {
+  const i = p.bag.equipment.findIndex((it) => it.uid === uid);
+  if (i < 0) return { ok: false, msg: '行囊里没有这件装备' };
+  const item = p.bag.equipment.splice(i, 1)[0];
+  const prev = p.equipment[item.slot];
+  if (prev) p.bag.equipment.push(prev);
+  p.equipment[item.slot] = item;
+  recomputePlayer(p);
+  return { ok: true, msg: `装备了「${item.name}」` };
+}
+
+function unequipItem(p, slot) {
+  const item = p.equipment[slot];
+  if (!item) return { ok: false, msg: '该槽位是空的' };
+  if (bagFull(p)) return { ok: false, msg: `行囊已满（${BAG_MAX} 件），无法卸下` };
+  p.equipment[slot] = null;
+  p.bag.equipment.push(item);
+  recomputePlayer(p);
+  return { ok: true, msg: `卸下了「${item.name}」` };
+}
+
+// 武学栏：已装备则卸下，未装备则装上（最多 LOADOUT_MAX 个）
+function toggleLoadout(p, skillId) {
+  if (!p.learned.includes(skillId)) return { ok: false, msg: '还没有学会这门武学' };
+  const i = p.skills.indexOf(skillId);
+  if (i >= 0) {
+    p.skills.splice(i, 1);
+    return { ok: true, msg: `卸下了「${SKILLS[skillId].name}」` };
+  }
+  if (p.skills.length >= LOADOUT_MAX) return { ok: false, msg: `武学栏已满（最多 ${LOADOUT_MAX} 个），先卸下一个` };
+  p.skills.push(skillId);
+  return { ok: true, msg: `装备了「${SKILLS[skillId].name}」` };
+}
+
+// 获得一门武学。新武学：学会，武学栏有空位就自动装上；重复获得：升一级；已满级：折算金币
+// 返回 { result:'new'|'level'|'maxed', level, autoEquipped?, gold? }
+function learnSkill(p, skillId) {
+  if (!p.skillLevels) p.skillLevels = {};
+  if (!p.learned.includes(skillId)) {
+    p.learned.push(skillId);
+    p.skillLevels[skillId] = 1;
+    const autoEquipped = !p.skills.includes(skillId) && p.skills.length < LOADOUT_MAX;
+    if (autoEquipped) p.skills.push(skillId);
+    return { result: 'new', level: 1, autoEquipped };
+  }
+  const lv = skillLevel(p, skillId);
+  if (lv >= SKILL_MAX_LEVEL) {
+    const gold = Math.round(SKILLS[skillId].price * growth(p.realm || 0) * SKILL_MAXED_REFUND);
+    p.gold += gold;
+    return { result: 'maxed', level: lv, gold };
+  }
+  p.skillLevels[skillId] = lv + 1;
+  return { result: 'level', level: lv + 1 };
+}
+
+function describeLearn(res, skillId) {
+  const name = SKILLS[skillId].name;
+  if (res.result === 'new') return `学会武学「${name}」${res.autoEquipped ? '（已装入武学栏）' : ''}`;
+  if (res.result === 'level') return `武学「${name}」升至 Lv.${res.level}`;
+  return `武学「${name}」已臻圆满，折算 ${res.gold} 金币`;
+}
+
+return { skillLevel, bagFull, addToBag, equipItem, unequipItem, toggleLoadout, learnSkill, describeLearn };
+},
+"data/skills.js": function () {
+// 武学数据（所有宗门通用）。element:'self' 表示跟随使用者的灵根属性
+// tag：武学类型，宗门使用自己擅长类型时更省灵力、威力更高；price：商店售价（没有 price 的不可学，如怪物功法）
+// then：释放后依次结算的效果，{chance?, do:{op,...}}；power 为 0 表示纯辅助武学
+const TAGS = { jian: '剑诀', dan: '丹法', fu: '符箓', ti: '体术', gui: '幽冥', za: '杂学', tong: '通用' };
+
+// 武学等级：重复获得同一门武学会升级，最高 Lv.5，每级威力 +10%；满级后再获得则折算金币
+const SKILL_MAX_LEVEL = 5;
+const SKILL_LEVEL_BONUS = 0.1;
+const SKILL_MAXED_REFUND = 0.5; // 满级重复获得时，折算为售价的 50%
+const levelMul = (level) => 1 + SKILL_LEVEL_BONUS * (Math.max(1, level) - 1);
+
+const SKILLS = {
+  basic: { id: 'basic', name: '普攻', element: 'self', mp: 0, power: 1.0, then: [], desc: '最基础的攻击' },
+
+  // 剑诀
+  yujian: { id: 'yujian', name: '御剑诀', tag: 'jian', price: 100, element: 'self', mp: 12, power: 1.6, then: [], desc: '御剑斩敌，威力 160%' },
+  wanjian: { id: 'wanjian', name: '万剑归宗', tag: 'jian', price: 220, element: 'self', mp: 30, power: 2.8, then: [], desc: '倾尽灵力的一击，威力 280%' },
+  pokong: { id: 'pokong', name: '破空斩', tag: 'jian', price: 120, element: 'self', mp: 8, power: 1.4, then: [], desc: '快而省灵力的一剑，威力 140%' },
+
+  // 丹法
+  danhuo: {
+    id: 'danhuo', name: '丹火术', tag: 'dan', price: 100, element: '火', mp: 10, power: 1.2,
+    then: [{ chance: 0.4, do: { op: 'status', id: 'burn', turns: 3 } }],
+    desc: '丹炉真火，40% 使敌人灼烧',
+  },
+  huiyuan: {
+    id: 'huiyuan', name: '回元诀', tag: 'dan', price: 120, element: 'self', mp: 15, power: 0,
+    then: [{ do: { op: 'heal', who: 'self', pct: 0.25 } }],
+    desc: '运转丹气，恢复 25% 生命',
+  },
+  danyan: {
+    id: 'danyan', name: '丹焰爆', tag: 'dan', price: 170, element: '火', mp: 18, power: 1.9,
+    then: [{ chance: 0.5, do: { op: 'status', id: 'burn', turns: 3 } }],
+    desc: '丹炉炸裂，威力 190%，50% 灼烧',
+  },
+
+  // 符箓
+  leifu: {
+    id: 'leifu', name: '雷击符', tag: 'fu', price: 100, element: '雷', mp: 12, power: 1.4,
+    then: [{ chance: 0.3, do: { op: 'status', id: 'root', turns: 1 } }],
+    desc: '引雷轰击，30% 使敌人定身',
+  },
+  zhenhun: {
+    id: 'zhenhun', name: '镇魂符', tag: 'fu', price: 140, element: 'self', mp: 20, power: 0.9,
+    then: [{ chance: 0.5, do: { op: 'status', id: 'freeze', turns: 1 } }],
+    desc: '符镇神魂，50% 使敌人冰封',
+  },
+  huofu: {
+    id: 'huofu', name: '烈火符', tag: 'fu', price: 130, element: '火', mp: 10, power: 1.3,
+    then: [{ chance: 0.35, do: { op: 'status', id: 'burn', turns: 3 } }],
+    desc: '符火焚身，35% 使敌人灼烧',
+  },
+
+  // 体术
+  bengshan: { id: 'bengshan', name: '崩山拳', tag: 'ti', price: 100, element: '土', mp: 10, power: 1.8, then: [], desc: '势大力沉的一拳，威力 180%' },
+  jinzhong: {
+    id: 'jinzhong', name: '金钟罩', tag: 'ti', price: 120, element: '金', mp: 15, power: 0,
+    then: [{ do: { op: 'shield', who: 'self', pct: 0.3 } }],
+    desc: '获得相当于 30% 生命上限的护盾',
+  },
+  tieshan: { id: 'tieshan', name: '铁山靠', tag: 'ti', price: 120, element: '土', mp: 9, power: 1.6, then: [], desc: '以身撞敌，威力 160%' },
+
+  // 幽冥
+  shihun: {
+    id: 'shihun', name: '噬魂', tag: 'gui', price: 110, element: '暗', mp: 12, power: 1.3,
+    then: [{ do: { op: 'heal', who: 'self', pctOfDealt: 0.5 } }],
+    desc: '吞噬魂魄，吸取伤害的 50% 为生命',
+  },
+  youming: {
+    id: 'youming', name: '幽冥爪', tag: 'gui', price: 110, element: '暗', mp: 12, power: 1.5,
+    then: [{ chance: 0.5, do: { op: 'status', id: 'poison', turns: 3 } }],
+    desc: '阴气入体，50% 使敌人中毒',
+  },
+  youhun: {
+    id: 'youhun', name: '幽魂噬', tag: 'gui', price: 170, element: '暗', mp: 16, power: 2.0,
+    then: [{ do: { op: 'heal', who: 'self', pctOfDealt: 0.3 } }],
+    desc: '威力 200%，吸取伤害的 30% 为生命',
+  },
+
+  // 杂学
+  lingshi: { id: 'lingshi', name: '灵石飞掷', tag: 'za', price: 100, element: 'self', mp: 10, power: 1.5, then: [], desc: '以灵石为暗器，威力 150%' },
+  zhaocai: {
+    id: 'zhaocai', name: '招财符', tag: 'za', price: 120, element: 'self', mp: 15, power: 0,
+    then: [{ do: { op: 'buff', who: 'self', stat: 'atk', mul: 1.3, turns: 3 } }],
+    desc: '3 回合内攻击提升 30%',
+  },
+  feidao: { id: 'feidao', name: '飞刀', tag: 'za', price: 90, element: 'self', mp: 6, power: 1.2, then: [], desc: '随手一掷，省灵力，威力 120%' },
+
+  // 通用（没有宗门擅长，但谁都能用）
+  lingqi: { id: 'lingqi', name: '灵气弹', tag: 'tong', price: 90, element: 'self', mp: 9, power: 1.5, then: [], desc: '凝聚灵气轰出，威力 150%' },
+  huichun: {
+    id: 'huichun', name: '回春术', tag: 'tong', price: 110, element: 'self', mp: 14, power: 0,
+    then: [{ do: { op: 'heal', who: 'self', pct: 0.3 } }],
+    desc: '草木生机，恢复 30% 生命',
+  },
+
+  // ---- 第二批武学（每个类型 3 个，威力、特效、灵力消耗各有取舍）----
+  // 剑诀
+  liuyun: {
+    id: 'liuyun', name: '流云剑', tag: 'jian', price: 140, element: 'self', mp: 14, power: 1.5,
+    then: [{ do: { op: 'buff', who: 'self', stat: 'spd', mul: 1.3, turns: 2 } }],
+    desc: '剑走如云，威力 150%，身法提升 30%（2 回合）',
+  },
+  zhanyue: { id: 'zhanyue', name: '斩月', tag: 'jian', price: 190, element: 'self', mp: 20, power: 2.3, then: [], desc: '一剑断月，威力 230%' },
+  jianhong: { id: 'jianhong', name: '剑虹贯日', tag: 'jian', price: 225, element: 'self', mp: 36, power: 3.4, then: [], desc: '倾尽全力的一剑，威力 340%，灵力消耗很大' },
+
+  // 丹法
+  bingxin: {
+    id: 'bingxin', name: '冰心诀', tag: 'dan', price: 150, element: '水', mp: 12, power: 1.1,
+    then: [{ do: { op: 'heal', who: 'self', pct: 0.12 } }],
+    desc: '寒意入心，威力 110%，同时回复 12% 生命',
+  },
+  huoyun: {
+    id: 'huoyun', name: '火云掌', tag: 'dan', price: 170, element: '火', mp: 16, power: 1.6,
+    then: [{ chance: 0.6, do: { op: 'status', id: 'burn', turns: 3 } }],
+    desc: '烈火焚身，威力 160%，60% 使敌人灼烧',
+  },
+  jiuzhuan: {
+    id: 'jiuzhuan', name: '九转还丹术', tag: 'dan', price: 220, element: 'self', mp: 28, power: 0,
+    then: [{ do: { op: 'heal', who: 'self', pct: 0.45 } }, { do: { op: 'mp', who: 'self', pct: 0.1 } }],
+    desc: '炼化丹气，恢复 45% 生命和 10% 灵力',
+  },
+
+  // 符箓
+  jinguang: {
+    id: 'jinguang', name: '金光符', tag: 'fu', price: 150, element: '金', mp: 14, power: 1.3,
+    then: [{ do: { op: 'shield', who: 'self', pct: 0.15 } }],
+    desc: '金光护体，威力 130%，获得 15% 生命上限的护盾',
+  },
+  dingshen: {
+    id: 'dingshen', name: '定身咒', tag: 'fu', price: 160, element: 'self', mp: 18, power: 0.6,
+    then: [{ chance: 0.75, do: { op: 'status', id: 'root', turns: 1 } }],
+    desc: '威力 60%，75% 使敌人定身',
+  },
+  tianlei: {
+    id: 'tianlei', name: '天雷符', tag: 'fu', price: 220, element: '雷', mp: 30, power: 2.4,
+    then: [{ chance: 0.25, do: { op: 'status', id: 'root', turns: 1 } }],
+    desc: '引九天雷霆，威力 240%，25% 使敌人定身',
+  },
+
+  // 体术
+  panshi: { id: 'panshi', name: '磐石击', tag: 'ti', price: 140, element: '土', mp: 14, power: 1.9, then: [], desc: '重若磐石的一击，威力 190%' },
+  kuangbao: {
+    id: 'kuangbao', name: '狂暴', tag: 'ti', price: 200, element: 'self', mp: 18, power: 0,
+    then: [{ do: { op: 'buff', who: 'self', stat: 'atk', mul: 1.6, turns: 3 } }],
+    desc: '气血翻涌，3 回合内攻击提升 60%',
+  },
+  jingang: {
+    id: 'jingang', name: '金刚不坏', tag: 'ti', price: 225, element: 'self', mp: 28, power: 0,
+    then: [{ do: { op: 'shield', who: 'self', pct: 0.5 } }],
+    desc: '获得相当于 50% 生命上限的护盾',
+  },
+
+  // 幽冥
+  xishou: {
+    id: 'xishou', name: '蚀骨', tag: 'gui', price: 150, element: '暗', mp: 14, power: 1.4,
+    then: [{ chance: 0.7, do: { op: 'status', id: 'poison', turns: 4 } }],
+    desc: '阴毒蚀骨，威力 140%，70% 使敌人中毒（4 回合）',
+  },
+  hunbo: {
+    id: 'hunbo', name: '魂魄冲击', tag: 'gui', price: 225, element: '暗', mp: 24, power: 2.3,
+    then: [{ do: { op: 'heal', who: 'self', pctOfDealt: 0.2 } }],
+    desc: '直击魂魄，威力 230%，吸取伤害的 20% 为生命',
+  },
+  youling: {
+    id: 'youling', name: '幽灵步', tag: 'gui', price: 170, element: 'self', mp: 12, power: 0,
+    then: [
+      { do: { op: 'buff', who: 'self', stat: 'spd', mul: 1.5, turns: 3 } },
+      { do: { op: 'buff', who: 'self', stat: 'crit', mul: 3, turns: 2 } },
+    ],
+    desc: '身法提升 50%（3 回合），暴击率大幅提升（2 回合）',
+  },
+
+  // 杂学
+  jinqian: { id: 'jinqian', name: '金钱镖', tag: 'za', price: 130, element: 'self', mp: 12, power: 1.7, then: [], desc: '飞镖连发，威力 170%' },
+  baoshi: { id: 'baoshi', name: '宝石暴雨', tag: 'za', price: 200, element: 'self', mp: 22, power: 2.2, then: [], desc: '漫天宝石如雨，威力 220%' },
+  caishen: {
+    id: 'caishen', name: '财神护体', tag: 'za', price: 190, element: 'self', mp: 18, power: 0,
+    then: [{ do: { op: 'shield', who: 'self', pct: 0.25 } }, { do: { op: 'buff', who: 'self', stat: 'def', mul: 1.3, turns: 3 } }],
+    desc: '获得 25% 生命上限的护盾，防御提升 30%（3 回合）',
+  },
+
+  // 通用
+  zhenqi: {
+    id: 'zhenqi', name: '真气护体', tag: 'tong', price: 100, element: 'self', mp: 12, power: 0,
+    then: [{ do: { op: 'shield', who: 'self', pct: 0.2 } }],
+    desc: '获得 20% 生命上限的护盾',
+  },
+  ningshen: {
+    id: 'ningshen', name: '凝神调息', tag: 'tong', price: 120, element: 'self', mp: 0, power: 0,
+    then: [{ do: { op: 'mp', who: 'self', pct: 0.3 } }],
+    desc: '不耗灵力，回复 30% 灵力，但这回合不攻击',
+  },
+  lingbao: { id: 'lingbao', name: '灵爆', tag: 'tong', price: 150, element: 'self', mp: 20, power: 2.0, then: [], desc: '灵力爆发，威力 200%' },
+
+  // 怪物功法（不可学）
+  bite: { id: 'bite', name: '撕咬', element: 'self', mp: 0, power: 1.2, then: [], desc: '' },
+  venom: {
+    id: 'venom', name: '毒牙', element: 'self', mp: 5, power: 1.0,
+    then: [{ chance: 0.5, do: { op: 'status', id: 'poison', turns: 3 } }],
+    desc: '',
+  },
+  smash: { id: 'smash', name: '重击', element: 'self', mp: 8, power: 1.8, then: [], desc: '' },
+  flame: {
+    id: 'flame', name: '火息', element: '火', mp: 8, power: 1.3,
+    then: [{ chance: 0.4, do: { op: 'status', id: 'burn', turns: 2 } }],
+    desc: '',
+  },
+};
+
+return { TAGS, SKILL_MAX_LEVEL, SKILL_LEVEL_BONUS, SKILL_MAXED_REFUND, levelMul, SKILLS };
+},
+"engine/loot.js": function () {
+// 随机装备的生成与定价。商人、魔修掉落、宝箱共用这里，品质概率都看玩家当前境界
+const { RARITIES, RARITY_INFO, RARITY_WEIGHTS, TEMPLATES, AFFIXES, AFFIX_SCALE, SLOTS, growth, INCOME_PER_LAYER, SLOT_PRICE_FACTOR, SELL_RATE, GEAR_SCALE } = __req("data/equipment.js");
+
+// 按境界的概率表抽一个品质：境界越高，越容易抽到好品质
+function rollRarity(rng, realm) {
+  const row = RARITY_WEIGHTS[Math.min(Math.max(realm, 0), RARITY_WEIGHTS.length - 1)];
+  const total = row.reduce((s, w) => s + w, 0);
+  let x = rng.next() * total;
+  for (let i = 0; i < row.length; i++) {
+    x -= row[i];
+    if (x < 0) return RARITIES[i];
+  }
+  return RARITIES[RARITIES.length - 1];
+}
+
+const newUid = (rng) => `e${rng.int(0, 0x7fffffff).toString(36)}${rng.int(0, 1295).toString(36)}`;
+
+// 生成一件随机装备实例。每条属性在 ±15% 内独立浮动；蓝装起带词条。
+// opts.rarity / opts.slot 可强制指定（测试或特殊奖励用）
+function generateEquipment(rng, realm, opts = {}) {
+  let rarity = opts.rarity || rollRarity(rng, realm);
+  if (opts.minRarity && RARITIES.indexOf(rarity) < RARITIES.indexOf(opts.minRarity)) rarity = opts.minRarity; // 至少这个品质
+  const info = RARITY_INFO[rarity];
+  const slot = opts.slot || rng.pick(SLOTS); // 先均匀选一个部位，再选这个部位的模板
+  const tpl = rng.pick(TEMPLATES.filter((t) => t.slot === slot));
+
+  const stats = {};
+  let rollSum = 0;
+  let rollCount = 0;
+  for (const [k, base] of Object.entries(tpl.stats)) {
+    const roll = 0.85 + rng.next() * 0.3;
+    rollSum += roll;
+    rollCount += 1;
+    if (k === 'crit') stats[k] = Math.max(0.005, Math.round(base * info.mul * roll * GEAR_SCALE * 200) / 200); // 0.5% 一档
+    else if (k === 'spd') stats[k] = Math.max(1, Math.round(base * (1 + 0.4 * realm) * info.mul * roll * GEAR_SCALE));
+    else stats[k] = Math.max(1, Math.round(base * growth(realm) * info.mul * roll * GEAR_SCALE));
+  }
+
+  const effects = [];
+  const mods = {};
+  const affixes = [];
+  const affixPool = [...AFFIXES];
+  for (let i = 0; i < info.affixes; i++) {
+    const a = affixPool.splice(rng.int(0, affixPool.length - 1), 1)[0];
+    const pct = Math.max(1, Math.round(a.base * AFFIX_SCALE[rarity]));
+    const built = a.build(pct);
+    effects.push(...(built.effects || []));
+    for (const [k, v] of Object.entries(built.mods || {})) mods[k] = (mods[k] || 0) + v;
+    affixes.push({ id: a.id, name: a.name, desc: a.desc(pct) });
+  }
+
+  const avgRoll = rollSum / rollCount; // 属性浮动越好，价格越高
+  const price = Math.max(1, Math.round(info.layers * INCOME_PER_LAYER * growth(realm) * SLOT_PRICE_FACTOR[tpl.slot] * avgRoll));
+  return {
+    uid: newUid(rng),
+    tpl: tpl.id,
+    name: `${info.prefix}${tpl.name}`,
+    icon: tpl.icon,
+    slot: tpl.slot,
+    rarity,
+    realm,
+    stats,
+    effects,
+    mods,
+    affixes,
+    price,
+  };
+}
+
+// 行囊满了、或卸下多余装备时折算成金币的数额
+const sellValue = (item) => Math.max(1, Math.round(item.price * SELL_RATE));
+
+// 武学、药品的价格也随境界放大（与金币收入同步）
+const skillPrice = (skill, realm) => Math.max(1, Math.round(skill.price * growth(realm)));
+const pillPrice = (item, realm) => Math.max(1, Math.round(item.price * growth(realm)));
+
+return { rollRarity, generateEquipment, sellValue, skillPrice, pillPrice };
+},
+"engine/rewards.js": function () {
+// 奖励：击败敌人的金币与掉落、宝箱。装备是随机生成的实例，武学可以重复刷出（重复则升级）
+const { SKILLS } = __req("data/skills.js");
+const { ITEMS } = __req("data/items.js");
+const { growth, itemTitle } = __req("data/equipment.js");
+const { generateEquipment } = __req("engine/loot.js");
+const { addToBag, learnSkill, describeLearn } = __req("engine/inventory.js");
+const { CHEST_GOLD_CHANCE, CHEST_GOLD_RANGE } = __req("engine/economy.js");
+const { KEY_DROP_CHANCE } = __req("data/demon.js");
+
+const learnable = () => Object.values(SKILLS).filter((s) => s.price);
+
+function rollRewards(enemy, player, rng) {
+  const [lo, hi] = enemy.gold || [0, 0];
+  const bonus = (player.mods && player.mods.goldMul) || 0;
+  const gold = Math.round(rng.int(lo, hi) * (1 + bonus));
+  const drops = [];
+  const loot = enemy.loot || {};
+  if (loot.equip && rng.chance(loot.equip)) drops.push({ kind: 'equip', item: generateEquipment(rng, player.realm || 0) });
+  if (loot.skill && rng.chance(loot.skill)) drops.push({ kind: 'skill', id: rng.pick(learnable()).id }); // 不排除已学会的
+  if (loot.item && rng.chance(loot.item)) drops.push({ kind: 'item', id: rng.chance(0.5) ? 'hp_pill' : 'mp_pill' });
+  if (enemy.human && rng.chance(KEY_DROP_CHANCE)) drops.push({ kind: 'key' }); // 魔修有几率掉落心魔钥匙
+  return { gold, drops };
+}
+
+// 宝箱：金币 35%、装备 30%、武学 15%、药品 20%。装备品质看境界，金币随境界放大
+function rollChest(rng, player) {
+  const realm = player.realm || 0;
+  const x = rng.next();
+  if (x < CHEST_GOLD_CHANCE) {
+    const bonus = (player.mods && player.mods.goldMul) || 0;
+    return { gold: Math.round(rng.int(CHEST_GOLD_RANGE[0], CHEST_GOLD_RANGE[1]) * growth(realm) * (1 + bonus)), drops: [], chest: true };
+  }
+  if (x < 0.65) return { gold: 0, drops: [{ kind: 'equip', item: generateEquipment(rng, realm) }], chest: true };
+  if (x < 0.8) return { gold: 0, drops: [{ kind: 'skill', id: rng.pick(learnable()).id }], chest: true };
+  return { gold: 0, drops: [{ kind: 'item', id: rng.chance(0.5) ? 'hp_pill' : 'mp_pill', count: rng.int(1, 2) }], chest: true };
+}
+
+// 把奖励结算到玩家身上，返回一段文字，如「获得金币 12；掉落：[白]粗制剑、武学「御剑诀」升至 Lv.2」
+function applyRewards(player, rewards) {
+  const parts = [];
+  if (rewards.gold > 0) parts.push(`获得金币 ${rewards.gold}`);
+  player.gold += rewards.gold;
+  const texts = [];
+  for (const d of rewards.drops) {
+    if (d.kind === 'equip') {
+      const r = addToBag(player, d.item);
+      texts.push(`${itemTitle(d.item)}${r.stored ? '' : `（行囊已满，折算 ${r.gold} 金币）`}`);
+    } else if (d.kind === 'key') {
+      player.keys = (player.keys || 0) + 1;
+      texts.push('「心魔钥匙」');
+    } else if (d.kind === 'skill') {
+      texts.push(describeLearn(learnSkill(player, d.id), d.id));
+    } else {
+      const n = d.count || 1;
+      player.items[d.id] = (player.items[d.id] || 0) + n;
+      texts.push(`「${ITEMS[d.id].name}」${n > 1 ? ` ×${n}` : ''}`);
+    }
+  }
+  if (texts.length) parts.push(`${rewards.chest ? '宝箱里是' : '掉落'}：${texts.join('、')}`);
+  return parts.join('；') || '什么也没有';
+}
+
+return { rollRewards, rollChest, applyRewards };
+},
+"data/items.js": function () {
+// 药品：price 为商店售价；每种可在商店限量购买
+const ITEMS = {
+  hp_pill: { id: 'hp_pill', name: '回春丹', price: 25, desc: '恢复 40% 生命', do: { op: 'heal', pct: 0.4 } },
+  mp_pill: { id: 'mp_pill', name: '聚灵丹', price: 20, desc: '恢复 50% 灵力', do: { op: 'mp', pct: 0.5 } },
+};
+
+return { ITEMS };
+},
+"engine/economy.js": function () {
+// 经济核算：用事件权重和怪物金币算出「每层历练的期望金币收入」，定价都以它为基准
+const { REGIONS } = __req("data/regions.js");
+const { MONSTERS } = __req("data/monsters.js");
+
+// 宝箱中开出金币的概率与金额区间（与 rewards.rollChest 保持一致）
+const CHEST_GOLD_CHANCE = 0.35;
+const CHEST_GOLD_RANGE = [18, 42];
+
+// 某区域、炼气期（境界系数 1）、无金币加成时，每层历练的期望金币收入
+function expectedIncomePerLayer(regionId = 'qingyun') {
+  const region = REGIONS[regionId];
+  const total = region.events.reduce((s, e) => s + e.weight, 0);
+  let income = 0;
+  for (const e of region.events) {
+    const p = e.weight / total;
+    if (e.monsters) {
+      const avg = e.monsters.reduce((s, id) => s + (MONSTERS[id].gold[0] + MONSTERS[id].gold[1]) / 2, 0) / e.monsters.length;
+      income += p * avg;
+    } else if (e.id === 'treasure') {
+      income += p * CHEST_GOLD_CHANCE * ((CHEST_GOLD_RANGE[0] + CHEST_GOLD_RANGE[1]) / 2);
+    }
+  }
+  return income;
+}
+
+return { CHEST_GOLD_CHANCE, CHEST_GOLD_RANGE, expectedIncomePerLayer };
+},
+"data/regions.js": function () {
+// 事件表：所有区域共用同一张（敌人的名字与强度随深度变化，见 data/world.js 与 monsters.js）
+// battle / moxiu 是战斗（moxiu 为魔修，金币更多、掉落更好）；merchant 为行商；treasure 为寻宝（宝箱）；rest 为营地休息
+// 权重之和为 100：战斗 50、魔修 10、行商 10、寻宝 10、休息 20
+const { BANDS } = __req("data/world.js");
+
+const EVENTS = [
+  { id: 'battle', weight: 50, monsters: ['qinglin_snake', 'shanxiao', 'chiyan_wolf', 'fugu_kui'] },
+  { id: 'moxiu', weight: 10, monsters: ['moxiu_apprentice', 'moxiu_guard'] },
+  { id: 'merchant', weight: 10 },
+  { id: 'treasure', weight: 10 },
+  { id: 'rest', weight: 20 },
+];
+
+const REGIONS = Object.fromEntries(BANDS.map((b) => [b.id, { id: b.id, name: b.name, events: EVENTS }]));
+
+return { EVENTS, REGIONS };
+},
+"data/demon.js": function () {
+// 魔界：七情心魔劫（七个试炼）与终局首领天道代行者
+const KEY_DROP_CHANCE = 0.05; // 击败魔修时掉落「心魔钥匙」的概率；每进一次魔界消耗一把
+const DEFEAT_HP_RATIO = 0.3; // 魔界里挑战失败：没有奖励，被击退逃出魔界，生命恢复到这个比例，不会身死道消
+const TRIAL_POWER = 1.6; // 试炼敌人的强度系数（相对同等级普通敌人），由模拟器调平衡
+const FINAL_POWER = 0.62; // 天道代行者的强度系数
+
+// 试炼敌人的基础数值（炼气期）：比同等级普通敌人强得多，再按玩家等级缩放
+const TRIAL_BASE = { maxHp: 220, atk: 16, def: 9, maxMp: 60, spd: 12, crit: 0.06, critDmg: 1.5 };
+const FINAL_BASE = { maxHp: 700, atk: 22, def: 14, maxMp: 120, spd: 16, crit: 0.1, critDmg: 1.7 };
+
+// rule 对应 combat/rules.js 里的战斗规则
+const TRIALS = [
+  { id: 'joy', name: '喜', title: '狂喜心魔', icon: '🤪', element: '火', skills: ['flame', 'bite'], rule: 'joy',
+    desc: '每回合开始，你会随机获得一项增益，同时附带一项随机反噬。' },
+  { id: 'wrath', name: '怒', title: '暴怒心魔', icon: '😡', element: '土', skills: ['smash', 'bite'], rule: 'wrath',
+    desc: '你的攻击翻倍，但防御归零。' },
+  { id: 'worry', name: '忧', title: '忧虑心魔', icon: '😟', element: '水', skills: ['venom', 'bite'], rule: 'worry',
+    desc: '每回合结束流失 15% 最大灵力，灵力耗尽就只能普攻。' },
+  { id: 'ponder', name: '思', title: '妄思心魔', icon: '🌀', element: '暗', skills: ['youming', 'bite'], rule: 'illusion',
+    desc: '你有 35% 的攻击会落在幻象上，白白浪费。' },
+  { id: 'grief', name: '悲', title: '悲恸心魔', icon: '😢', element: '水', skills: ['venom', 'smash'], rule: 'grief',
+    desc: '每回合结束损失生命上限的一部分，而且逐回合递增，必须速战速决。' },
+  { id: 'fear', name: '恐', title: '恐惧心魔', icon: '😱', element: '暗', skills: ['youming', 'smash'], rule: 'fear',
+    desc: '敌人的生命与数值被隐藏，而且更容易暴击。' },
+  { id: 'shock', name: '惊', title: '惊魂心魔', icon: '⚡', element: '雷', skills: ['flame', 'smash'], rule: 'shock',
+    desc: '你每回合有 30% 概率行动被打断；吃丹药可获得「定心」，抵消打断。' },
+];
+
+const FINAL = {
+  id: 'tiandao', name: '天道代行者', icon: '☯️', element: '金', skills: ['smash', 'flame', 'youming'], rule: 'tiandao',
+  desc: '终局首领，三个阶段：劫云、规则篡改、道心审判。',
+};
+
+const SHARDS_NEEDED = TRIALS.length;
+
+// 结局文字
+const ENDING = [
+  '劫云散尽，天道代行者化作漫天星屑。',
+  '你终于明白，七情不是要斩断的心魔，而是修行路上本就该有的重量。',
+  '道心圆满，前路依旧漫长。你收起剑，继续向更深处走去。',
+];
+
+return { KEY_DROP_CHANCE, DEFEAT_HP_RATIO, TRIAL_POWER, FINAL_POWER, TRIAL_BASE, FINAL_BASE, TRIALS, FINAL, SHARDS_NEEDED, ENDING };
+},
+"engine/shop.js": function () {
+// 行商：每次遇到都随机生成 3 件装备（品质看境界、数值随机）、2 门武学（可能是已学会的，重复则升级）和限量药品。
+// 库存存进 run.shop，刷新页面不会重新刷货
+const { SKILLS, SKILL_MAX_LEVEL } = __req("data/skills.js");
+const { ITEMS } = __req("data/items.js");
+const { BAG_MAX, itemTitle } = __req("data/equipment.js");
+const { generateEquipment, skillPrice, pillPrice } = __req("engine/loot.js");
+const { bagFull, learnSkill, describeLearn, skillLevel } = __req("engine/inventory.js");
+
+const PILL_STOCK = 3;
+
+function pickN(rng, arr, n) {
+  const pool = [...arr];
+  const out = [];
+  while (out.length < n && pool.length) out.push(pool.splice(rng.int(0, pool.length - 1), 1)[0]);
+  return out;
+}
+
+function generateShop(rng, player) {
+  const realm = player.realm || 0;
+  const discount = (player.mods && player.mods.shopDiscount) || 1;
+  const price = (base) => Math.max(1, Math.round(base * discount));
+  const equip = Array.from({ length: 3 }, () => {
+    const item = generateEquipment(rng, realm);
+    return { kind: 'equip', item, price: price(item.price), sold: false };
+  });
+  const skills = pickN(rng, Object.values(SKILLS).filter((s) => s.price), 2).map((s) => ({
+    kind: 'skill', id: s.id, price: price(skillPrice(s, realm)), sold: false, // 不排除已学会的：重复购买可升级
+  }));
+  const items = Object.values(ITEMS).map((i) => ({
+    kind: 'item', id: i.id, price: price(pillPrice(i, realm)), stock: PILL_STOCK, sold: false,
+  }));
+  return [...equip, ...skills, ...items];
+}
+
+function shopEntryName(entry) {
+  if (entry.kind === 'equip') return entry.item.name;
+  if (entry.kind === 'skill') return SKILLS[entry.id].name;
+  return ITEMS[entry.id].name;
+}
+
+function buyFromShop(player, shop, index) {
+  const entry = shop[index];
+  if (!entry) return { ok: false, msg: '没有这件商品' };
+  if (entry.sold) return { ok: false, msg: '已售罄' };
+  if (entry.kind === 'equip' && bagFull(player)) return { ok: false, msg: `行囊已满（${BAG_MAX} 件），先整理一下` };
+  if (entry.kind === 'skill' && skillLevel(player, entry.id) >= SKILL_MAX_LEVEL) return { ok: false, msg: '这门武学已经满级了' };
+  if (player.gold < entry.price) return { ok: false, msg: '金币不足' };
+  player.gold -= entry.price;
+  let what;
+  if (entry.kind === 'equip') {
+    player.bag.equipment.push(entry.item);
+    entry.sold = true;
+    what = `购买了${itemTitle(entry.item)}，已放入行囊`;
+  } else if (entry.kind === 'skill') {
+    what = describeLearn(learnSkill(player, entry.id), entry.id);
+    entry.sold = true;
+  } else {
+    player.items[entry.id] = (player.items[entry.id] || 0) + 1;
+    entry.stock -= 1;
+    if (entry.stock <= 0) entry.sold = true;
+    what = `购买了「${ITEMS[entry.id].name}」`;
+  }
+  return { ok: true, msg: `${what}，花费 ${entry.price} 金币` };
+}
+
+return { generateShop, shopEntryName, buyFromShop };
+},
+"engine/demon.js": function () {
+// 魔界：试炼敌人按玩家当前等级生成，所以任何时候进来难度都合适；钥匙、碎片、召唤终局首领、奖励
+const { TRIALS, FINAL, TRIAL_BASE, FINAL_BASE, TRIAL_POWER, FINAL_POWER, SHARDS_NEEDED, DEFEAT_HP_RATIO } = __req("data/demon.js");
+const { ENEMY_ATK, ENEMY_EXTRA } = __req("data/world.js");
+const { growth } = __req("data/equipment.js");
+const { generateEquipment } = __req("engine/loot.js");
+
+const trialById = (id) => TRIALS.find((t) => t.id === id);
+
+function build(base, tpl, player, power) {
+  const lv = player.lv || 0;
+  const k = growth(lv) * (1 + ENEMY_EXTRA * lv) * power;
+  const maxHp = Math.round(base.maxHp * k);
+  const maxMp = Math.round(base.maxMp * (1 + 0.5 * lv));
+  return {
+    id: `demon_${tpl.id}`,
+    name: tpl.title || tpl.name,
+    side: 'enemy',
+    icon: tpl.icon,
+    element: tpl.element,
+    human: false,
+    lv,
+    gold: [0, 0],
+    loot: {},
+    isTrial: true,
+    trialId: tpl.id,
+    rule: tpl.rule,
+    stats: {
+      maxHp, atk: Math.max(1, Math.round(base.atk * k * ENEMY_ATK)), def: Math.round(base.def * k), maxMp,
+      spd: Math.round(base.spd + 2 * lv), crit: base.crit, critDmg: base.critDmg,
+    },
+    hp: maxHp,
+    mp: maxMp,
+    shield: 0,
+    skills: [...tpl.skills],
+    effects: [],
+    statuses: [],
+    items: {},
+    flags: { used: {}, stacks: {} },
+    dead: false,
+  };
+}
+
+const createTrialEnemy = (trial, player) => build(TRIAL_BASE, trial, player, TRIAL_POWER);
+const createFinalBoss = (player) => ({ ...build(FINAL_BASE, FINAL, player, FINAL_POWER), name: FINAL.name, isFinal: true });
+
+// 进入魔界：消耗一把心魔钥匙。没有钥匙返回 false
+function enterDemon(player, run) {
+  if (!(player.keys > 0)) return false;
+  player.keys -= 1;
+  run.demon.inside = true;
+  return true;
+}
+
+function leaveDemon(run) {
+  run.demon.inside = false;
+}
+
+// 魔界里挑战失败：不会死。这次试炼没有奖励，被击退并逃出魔界，生命恢复到 30%。返回恢复后的生命
+function defeatInDemon(run) {
+  const p = run.player;
+  p.dead = false;
+  p.shield = 0;
+  p.statuses = [];
+  p.hp = Math.max(1, Math.round(p.stats.maxHp * DEFEAT_HP_RATIO));
+  run.demon.inside = false;
+  return p.hp;
+}
+
+const trialCleared = (run, id) => run.demon.shards.includes(id);
+const canSummon = (run) => run.demon.shards.length >= SHARDS_NEEDED && !run.demon.won;
+
+// 通过试炼：记一块碎片（同一个试炼只记一次）
+function clearTrial(run, id) {
+  if (!run.demon.shards.includes(id)) run.demon.shards.push(id);
+}
+
+// 试炼与终局首领的奖励：金币 + 装备（试炼至少蓝品；终局 2 件，至少黄品）
+function demonRewards(player, rng, isFinal) {
+  const realm = player.realm || 0;
+  if (isFinal) {
+    return {
+      gold: Math.round(600 * growth(realm)),
+      drops: [
+        { kind: 'equip', item: generateEquipment(rng, realm, { minRarity: 'legendary' }) },
+        { kind: 'equip', item: generateEquipment(rng, realm, { minRarity: 'legendary' }) },
+      ],
+    };
+  }
+  return {
+    gold: Math.round(60 * growth(realm)),
+    drops: [{ kind: 'equip', item: generateEquipment(rng, realm, { minRarity: 'rare' }) }],
+  };
+}
+
+return { trialById, createTrialEnemy, createFinalBoss, enterDemon, leaveDemon, defeatInDemon, trialCleared, canSummon, clearTrial, demonRewards };
+},
+"combat/battle.js": function () {
+const { SKILLS } = __req("data/skills.js");
+const { canAct, consumeSkip, getStat, tickEnd } = __req("combat/status.js");
+const { applyDamage, emit, fireTrigger, runOp } = __req("combat/effects.js");
+const { canAfford, useItem, useSkill } = __req("combat/skills.js");
+const { chooseEnemyAction } = __req("combat/autoplay.js");
+const { initRule, ruleTurnStart, ruleTurnEnd, ruleInterrupt } = __req("combat/rules.js");
+
+// rule：魔界试炼等特殊战斗的规则名（见 combat/rules.js），普通战斗为 null
+function createBattle({ player, enemy, rng, rule = null }) {
+  const battle = { turn: 1, player, enemy, rng, log: [], over: false, winner: null, _depth: 0, rule };
+  emit(battle, `遭遇 ${enemy.name}！`, { kind: 'info' });
+  initRule(battle);
+  return battle;
+}
+
+function checkOver(battle) {
+  if (battle.over) return;
+  if (battle.player.dead) {
+    battle.over = true;
+    battle.winner = 'enemy';
+    emit(battle, `你被 ${battle.enemy.name} 击败了……`, { kind: 'end' });
+  } else if (battle.enemy.dead) {
+    battle.over = true;
+    battle.winner = 'player';
+    emit(battle, `你击败了 ${battle.enemy.name}！`, { kind: 'end' });
+  }
+}
+
+function perform(battle, actor, foe, action) {
+  switch (action.type) {
+    case 'skill': {
+      const skill = SKILLS[action.skillId];
+      if (skill && actor.skills.includes(action.skillId) && canAfford(actor, action.skillId)) {
+        useSkill(battle, actor, foe, skill);
+        return;
+      }
+      emit(battle, `${actor.name} 灵力不足，改为普攻`, { kind: 'info' });
+      useSkill(battle, actor, foe, SKILLS.basic);
+      return;
+    }
+    case 'item':
+      if (useItem(battle, actor, action.itemId)) return;
+      emit(battle, `${actor.name} 没有可用的丹药，改为普攻`, { kind: 'info' });
+      useSkill(battle, actor, foe, SKILLS.basic);
+      return;
+    default:
+      useSkill(battle, actor, foe, SKILLS.basic);
+  }
+}
+
+function endTurn(battle) {
+  for (const unit of [battle.player, battle.enemy]) {
+    if (unit.dead) continue;
+    const foe = unit === battle.player ? battle.enemy : battle.player;
+    const { dots } = tickEnd(unit);
+    for (const d of dots) {
+      applyDamage(battle, unit, d.amount, null);
+      emit(battle, `${unit.name} 受「${d.name}」折磨，损失 ${d.amount} 点生命`, { kind: 'damage', target: unit.side });
+      if (unit.dead) break;
+    }
+    if (!unit.dead) {
+      runOp(battle, { op: 'mp', pct: 0.05 }, unit, null);
+      fireTrigger(battle, 'turnEnd', unit, foe);
+    }
+    checkOver(battle);
+    if (battle.over) return;
+  }
+  ruleTurnEnd(battle);
+  checkOver(battle);
+  if (battle.over) return;
+  battle.turn += 1;
+}
+
+// 推进一个回合：双方按速度依次行动，playerAction 为玩家本回合选择
+function step(battle, playerAction) {
+  if (battle.over) return battle;
+  const { player, enemy } = battle;
+  ruleTurnStart(battle);
+  checkOver(battle);
+  if (battle.over) return battle;
+  const order = getStat(enemy, 'spd') > getStat(player, 'spd') ? [enemy, player] : [player, enemy];
+  for (const actor of order) {
+    if (battle.over) break;
+    if (actor.dead) continue;
+    const foe = actor === player ? enemy : player;
+    fireTrigger(battle, 'turnStart', actor, foe);
+    if (!canAct(actor)) {
+      const name = consumeSkip(actor);
+      emit(battle, `${actor.name} 被「${name}」所困，无法行动`, { kind: 'info' });
+    } else if (ruleInterrupt(battle, actor)) {
+      // 被惊扰打断，本回合无法行动
+    } else {
+      perform(battle, actor, foe, actor === player ? playerAction : chooseEnemyAction(battle));
+    }
+    checkOver(battle);
+  }
+  if (!battle.over) endTurn(battle);
+  return battle;
+}
+
+return { createBattle, step };
+},
+"combat/status.js": function () {
+// 状态系统：纯函数，不依赖其他模块
+const STATUS_DEFS = {
+  burn: { name: '灼烧', dotPct: 0.05 },
+  poison: { name: '中毒', dotPct: 0.04 },
+  freeze: { name: '冰封', skip: true },
+  root: { name: '定身', skip: true },
+  buff: { name: '增益' },
+};
+
+function applyStatus(unit, id, turns, extra = {}) {
+  const existing = unit.statuses.find((s) => s.id === id && s.stat === extra.stat);
+  if (existing) {
+    existing.turns = Math.max(existing.turns, turns);
+    Object.assign(existing, extra);
+  } else {
+    unit.statuses.push({ id, turns, ...extra });
+  }
+}
+
+function hasStatus(unit, id) {
+  return unit.statuses.some((s) => s.id === id);
+}
+
+function canAct(unit) {
+  return !unit.statuses.some((s) => STATUS_DEFS[s.id] && STATUS_DEFS[s.id].skip);
+}
+
+// 因冰封/定身跳过行动时消耗一回合，返回状态名（没有则返回 null）
+function consumeSkip(unit) {
+  const s = unit.statuses.find((x) => STATUS_DEFS[x.id] && STATUS_DEFS[x.id].skip);
+  if (!s) return null;
+  s.turns -= 1;
+  if (s.turns <= 0) unit.statuses.splice(unit.statuses.indexOf(s), 1);
+  return STATUS_DEFS[s.id].name;
+}
+
+function getStat(unit, name) {
+  let value = unit.stats[name];
+  for (const s of unit.statuses) {
+    if (s.id === 'buff' && s.stat === name) value *= s.mul;
+  }
+  return value;
+}
+
+// 回合结束：返回持续伤害，并递减回合（跳过类状态不在这里递减）
+function tickEnd(unit) {
+  const dots = [];
+  for (const s of unit.statuses) {
+    const def = STATUS_DEFS[s.id];
+    if (def && def.dotPct) {
+      dots.push({ id: s.id, name: def.name, amount: Math.max(1, Math.round(unit.stats.maxHp * def.dotPct)) });
+    }
+  }
+  const expired = [];
+  unit.statuses = unit.statuses.filter((s) => {
+    const def = STATUS_DEFS[s.id];
+    if (def && def.skip) return true;
+    s.turns -= 1;
+    if (s.turns <= 0) {
+      expired.push(s.id);
+      return false;
+    }
+    return true;
+  });
+  return { dots, expired };
+}
+
+return { STATUS_DEFS, applyStatus, hasStatus, canAct, consumeSkip, getStat, tickEnd };
+},
+"combat/effects.js": function () {
+// 效果引擎：装备/功法/被动都用数据声明 {on, chance, do:{op,...}}，在这里统一执行
+const { applyStatus, getStat, STATUS_DEFS } = __req("combat/status.js");
+
+const STAT_NAMES = { atk: '攻击', def: '防御', spd: '身法', crit: '暴击' };
+const MAX_DEPTH = 3; // 触发链最大深度，防止互相反伤导致死循环
+
+function emit(battle, text, extra = {}) {
+  if (battle && battle.log) battle.log.push({ text, ...extra });
+}
+
+function pickUnit(ctx, params, fallback) {
+  return (params.who || fallback) === 'self' ? ctx.source : ctx.target;
+}
+
+const OPS = {
+  heal(ctx, p) {
+    const unit = pickUnit(ctx, p, 'self');
+    if (!unit || unit.dead) return;
+    let amount;
+    if (p.flat !== undefined) amount = p.flat;
+    else if (p.pctOfDealt !== undefined) amount = Math.round((ctx.extra.dealt || 0) * p.pctOfDealt);
+    else amount = Math.round(unit.stats.maxHp * (p.pct || 0));
+    const before = unit.hp;
+    unit.hp = Math.min(unit.stats.maxHp, unit.hp + amount);
+    const gained = unit.hp - before;
+    if (gained > 0) emit(ctx.battle, `${unit.name} 恢复了 ${gained} 点生命`, { kind: 'heal' });
+  },
+  mp(ctx, p) {
+    const unit = pickUnit(ctx, p, 'self');
+    if (!unit || unit.dead) return;
+    const amount = p.flat !== undefined ? p.flat : Math.round(unit.stats.maxMp * (p.pct || 0));
+    const before = unit.mp;
+    unit.mp = Math.min(unit.stats.maxMp, unit.mp + amount);
+    if (unit.mp > before) emit(ctx.battle, `${unit.name} 回复了 ${unit.mp - before} 点灵力`, { kind: 'mp' });
+  },
+  damage(ctx, p) {
+    const unit = pickUnit(ctx, p, 'foe');
+    if (!unit || unit.dead) return;
+    const amount = p.flat !== undefined ? p.flat : Math.round(getStat(ctx.source, 'atk') * (p.pct || 0));
+    const dealt = applyDamage(ctx.battle, unit, amount, ctx.source);
+    emit(ctx.battle, `${ctx.source.name} 的效果令 ${unit.name} 受到 ${dealt} 点伤害`, { kind: 'damage' });
+  },
+  status(ctx, p) {
+    const unit = pickUnit(ctx, p, 'foe');
+    if (!unit || unit.dead) return;
+    applyStatus(unit, p.id, p.turns || 1);
+    const def = STATUS_DEFS[p.id];
+    emit(ctx.battle, `${unit.name} 陷入「${def ? def.name : p.id}」`, { kind: 'status' });
+  },
+  shield(ctx, p) {
+    const unit = pickUnit(ctx, p, 'self');
+    if (!unit || unit.dead) return;
+    const amount = Math.round(unit.stats.maxHp * (p.pct || 0));
+    unit.shield += amount;
+    emit(ctx.battle, `${unit.name} 获得 ${amount} 点护盾`, { kind: 'shield' });
+  },
+  buff(ctx, p) {
+    const unit = pickUnit(ctx, p, 'self');
+    if (!unit || unit.dead) return;
+    applyStatus(unit, 'buff', p.turns || 1, { stat: p.stat, mul: p.mul });
+    emit(ctx.battle, `${unit.name} 的${STAT_NAMES[p.stat] || p.stat}提升`, { kind: 'buff' });
+  },
+  // 叠层（如剑修的剑意）：每次 +1，最多 max 层。层数存在 unit.flags.stacks，每场战斗开始清零
+  stack(ctx, p) {
+    const unit = pickUnit(ctx, p, 'self');
+    if (!unit || unit.dead) return;
+    if (!unit.flags.stacks) unit.flags.stacks = {};
+    const before = unit.flags.stacks[p.key] || 0;
+    const n = Math.min(p.max || 99, before + 1);
+    unit.flags.stacks[p.key] = n;
+    if (n !== before) emit(ctx.battle, `${unit.name} 的${p.label || p.key}叠至 ${n} 层`, { kind: 'buff' });
+  },
+  // 存魂（鬼修）：unit.souls 跨战斗保留，最多 max
+  soul(ctx, p) {
+    const unit = pickUnit(ctx, p, 'self');
+    if (!unit) return;
+    const before = unit.souls || 0;
+    unit.souls = Math.min(p.max || 10, before + (p.n || 1));
+    if (unit.souls > before) emit(ctx.battle, `${unit.name} 吞噬一缕魂魄（${unit.souls}）`, { kind: 'buff' });
+  },
+  revive(ctx, p) {
+    const unit = ctx.source;
+    if (unit.hp > 0) return;
+    unit.hp = Math.max(1, Math.round(unit.stats.maxHp * (p.pct || 0.3)));
+    emit(ctx.battle, `${unit.name} 复生了！`, { kind: 'revive' });
+  },
+};
+
+function runOp(battle, spec, source, target, extra = {}) {
+  const fn = OPS[spec.op];
+  if (!fn) throw new Error(`未知效果 op: ${spec.op}`);
+  fn({ battle, source, target, extra }, spec);
+}
+
+// 触发 source 身上所有挂在 trigger 上的效果
+function fireTrigger(battle, trigger, source, target, extra = {}) {
+  if (!source || !source.effects) return;
+  const depth = battle._depth || 0;
+  if (depth >= MAX_DEPTH) return;
+  battle._depth = depth + 1;
+  try {
+    for (const eff of source.effects) {
+      if (eff.on !== trigger) continue;
+      if (eff.once && eff.id && source.flags.used[eff.id]) continue;
+      if (eff.if && eff.if.hpBelow !== undefined && !(source.hp / source.stats.maxHp < eff.if.hpBelow)) continue;
+      if (eff.chance !== undefined && !battle.rng.chance(eff.chance)) continue;
+      if (eff.once && eff.id) source.flags.used[eff.id] = true;
+      runOp(battle, eff.do, source, target, extra);
+    }
+  } finally {
+    battle._depth = depth;
+  }
+}
+
+// 统一的扣血入口：先扣护盾，再触发受击/死亡/击杀。返回实际扣掉的生命
+function applyDamage(battle, unit, amount, source) {
+  if (unit.dead) return 0;
+  let dmg = Math.max(0, Math.round(amount));
+  if (unit.shield > 0 && dmg > 0) {
+    const absorbed = Math.min(unit.shield, dmg);
+    unit.shield -= absorbed;
+    dmg -= absorbed;
+  }
+  const before = unit.hp;
+  unit.hp = Math.max(0, unit.hp - dmg);
+  const dealt = before - unit.hp;
+  if (unit.hp > 0) {
+    if (dealt > 0 && source) fireTrigger(battle, 'hit', unit, source, { taken: dealt });
+    return dealt;
+  }
+  fireTrigger(battle, 'death', unit, source);
+  if (unit.hp > 0) return dealt; // 被复生
+  unit.dead = true;
+  if (source && source !== unit) fireTrigger(battle, 'kill', source, unit);
+  return dealt;
+}
+
+return { emit, OPS, runOp, fireTrigger, applyDamage };
+},
+"combat/skills.js": function () {
+const { SKILLS, levelMul } = __req("data/skills.js");
+const { ITEMS } = __req("data/items.js");
+const { elementMultiplier } = __req("engine/elements.js");
+const { getStat } = __req("combat/status.js");
+const { applyDamage, fireTrigger, runOp, emit } = __req("combat/effects.js");
+const { ruleMiss, ruleOnItem, ruleNeutralElements } = __req("combat/rules.js");
+
+// 灵力消耗：使用本宗门擅长类型的武学时 ×0.8（向上取整）
+function skillCost(unit, skill) {
+  if (skill.tag && unit.affinity && skill.tag === unit.affinity) return Math.ceil(skill.mp * 0.8);
+  return skill.mp;
+}
+
+function canAfford(unit, skillId) {
+  const s = SKILLS[skillId];
+  return !!s && unit.mp >= skillCost(unit, s);
+}
+
+// 列出某个单位当前可选的行动（供界面渲染）：普攻、武学、丹药
+function listActions(unit) {
+  const acts = [{ type: 'attack', affordable: true }];
+  for (const id of unit.skills) {
+    acts.push({ type: 'skill', skillId: id, affordable: canAfford(unit, id), cost: skillCost(unit, SKILLS[id]) });
+  }
+  for (const [id, n] of Object.entries(unit.items)) {
+    if (n > 0) acts.push({ type: 'item', itemId: id, count: n, affordable: true });
+  }
+  return acts;
+}
+
+function calcDamage(battle, attacker, defender, skill) {
+  const atk = getStat(attacker, 'atk');
+  // 防御按防守方的等级归一化：防御与攻击同步放大时，减伤比例保持不变（否则高等级下敌人的伤害会被「饱和」）
+  const def = getStat(defender, 'def') / Math.pow(1.7, defender.lv || 0);
+  const element = skill.element === 'self' ? attacker.element : skill.element;
+  const elemMul = ruleNeutralElements(battle) ? 1 : elementMultiplier(element, defender.element);
+  const variance = 0.9 + battle.rng.next() * 0.2;
+  const crit = battle.rng.chance(getStat(attacker, 'crit'));
+  // 同源：功法自带元素与使用者灵根相同时威力 +20%
+  const sameSource = skill.element !== 'self' && skill.element === attacker.element ? 1.2 : 1;
+  // 擅长：宗门擅长类型的武学威力 +15%
+  const affinity = skill.tag && attacker.affinity === skill.tag ? 1.15 : 1;
+  // 宗门独门机制：剑意叠层、鬼修存魂加成攻击
+  const am = attacker.mods || {};
+  let bonus = 1;
+  if (am.stackDamage) {
+    for (const [key, per] of Object.entries(am.stackDamage)) bonus += per * ((attacker.flags.stacks && attacker.flags.stacks[key]) || 0);
+  }
+  if (am.soulAtk) bonus += am.soulAtk * (attacker.souls || 0);
+  // 体修：低血量时受到的伤害降低
+  const low = defender.mods && defender.mods.lowHp;
+  const taken = low && defender.hp / defender.stats.maxHp < low.below ? low.takenMul : 1;
+  // 武学等级：每级威力 +10%
+  const level = levelMul((attacker.skillLevels && attacker.skillLevels[skill.id]) || 1);
+  let dmg = ((atk * skill.power * level * 100) / (100 + def)) * elemMul * sameSource * affinity * bonus * taken * variance;
+  if (crit) dmg *= attacker.stats.critDmg;
+  return { amount: Math.max(1, Math.round(dmg)), crit, elemMul };
+}
+
+function useSkill(battle, actor, target, skill) {
+  let cost = skillCost(actor, skill);
+  const fc = actor.mods && actor.mods.freeCast;
+  if (fc && skill.tag === fc.tag && cost > 0 && battle.rng.chance(fc.chance)) {
+    cost = 0;
+    emit(battle, `${actor.name} 符意不绝，这次不消耗灵力`, { kind: 'buff' });
+  }
+  actor.mp -= cost;
+  if (skill.power === 0 && actor.flags.stacks) actor.flags.stacks = {}; // 辅助武学打断叠层
+  if (skill.power > 0 && ruleMiss(battle, actor)) return; // 魔界·妄思：攻击落在幻象上
+  let dealt = 0;
+  if (skill.power > 0) {
+    const { amount, crit, elemMul } = calcDamage(battle, actor, target, skill);
+    dealt = applyDamage(battle, target, amount, actor);
+    const note = elemMul > 1 ? '（五行克制）' : elemMul < 1 ? '（被五行克制）' : '';
+    emit(
+      battle,
+      `${actor.name} ${skill.id === 'basic' ? '发动攻击' : `施展「${skill.name}」`}，${crit ? '暴击！' : ''}对 ${target.name} 造成 ${amount} 点伤害${note}`,
+      { kind: 'damage', crit, target: target.side },
+    );
+    fireTrigger(battle, 'attack', actor, target, { dealt });
+  } else {
+    emit(battle, `${actor.name} 施展「${skill.name}」`, { kind: 'cast' });
+  }
+  for (const t of skill.then || []) {
+    if (t.chance !== undefined && !battle.rng.chance(t.chance)) continue;
+    runOp(battle, t.do, actor, target, { dealt });
+  }
+}
+
+function useItem(battle, actor, itemId) {
+  const item = ITEMS[itemId];
+  if (!item || !(actor.items[itemId] > 0)) return false;
+  actor.items[itemId] -= 1;
+  if (actor.flags.stacks) actor.flags.stacks = {}; // 吃药打断叠层
+  const power = (actor.mods && actor.mods.itemPower) || 1; // 丹修：药效提升
+  const spec = { ...item.do };
+  if (spec.pct !== undefined) spec.pct *= power;
+  emit(battle, `${actor.name} 服用了「${item.name}」`, { kind: 'cast' });
+  runOp(battle, spec, actor, null);
+  ruleOnItem(battle, actor);
+  return true;
+}
+
+return { skillCost, canAfford, listActions, calcDamage, useSkill, useItem };
+},
+"engine/elements.js": function () {
+const ELEMENTS = ['金', '木', '水', '火', '土', '雷', '冰', '风', '暗'];
+
+// 五行相克：key 克制 value
+const COUNTERS = { 金: '木', 木: '土', 土: '水', 水: '火', 火: '金' };
+
+function elementMultiplier(attack, defend) {
+  if (COUNTERS[attack] === defend) return 1.3;
+  if (COUNTERS[defend] === attack) return 0.75;
+  return 1;
+}
+
+return { ELEMENTS, COUNTERS, elementMultiplier };
+},
+"combat/rules.js": function () {
+// 战斗规则：魔界七情试炼与天道代行者的主题机制。battle.rule 指定规则名，没有规则时所有钩子都什么也不做
+const { applyStatus } = __req("combat/status.js");
+const { applyDamage, emit } = __req("combat/effects.js");
+
+const RULE_INFO = {
+  joy: { name: '狂喜', desc: '每回合随机获得一项增益，同时附带一项随机反噬' },
+  wrath: { name: '暴怒', desc: '你的攻击翻倍，防御归零' },
+  worry: { name: '忧虑', desc: '每回合流失 15% 最大灵力' },
+  illusion: { name: '妄思', desc: '35% 的攻击会落在幻象上' },
+  grief: { name: '悲恸', desc: '每回合损失生命上限的一部分，逐回合递增' },
+  fear: { name: '恐惧', desc: '敌人数值被隐藏，且暴击率 +25%' },
+  shock: { name: '惊魂', desc: '每回合 30% 概率行动被打断；吃丹药获得定心' },
+  tiandao: { name: '天道', desc: '劫雷、规则篡改、道心审判三个阶段' },
+};
+
+const active = (battle) => !!(battle && battle.rule);
+
+// 战斗开始时的初始化（上状态、改数值）
+function initRule(battle) {
+  if (!active(battle)) return;
+  const { player: p, enemy: e, rule } = battle;
+  if (rule === 'wrath') {
+    applyStatus(p, 'buff', 999, { stat: 'atk', mul: 2 });
+    applyStatus(p, 'buff', 999, { stat: 'def', mul: 0 });
+    emit(battle, '怒火中烧：你的攻击翻倍，但防御归零！', { kind: 'info' });
+  } else if (rule === 'fear') {
+    e.stats.crit += 0.25;
+    emit(battle, '恐惧笼罩着你，看不清对手的虚实……', { kind: 'info' });
+  } else if (rule === 'tiandao') {
+    e.flags.phase = 1;
+    emit(battle, '天道降临，劫云在头顶翻涌。', { kind: 'info' });
+  } else if (rule === 'shock') {
+    emit(battle, '惊魂未定：你随时可能被打断，吃丹药可以安定心神。', { kind: 'info' });
+  }
+}
+
+function joyTurn(battle) {
+  const { player: p, enemy: e } = battle;
+  const boons = [
+    () => { applyStatus(p, 'buff', 2, { stat: 'atk', mul: 1.5 }); emit(battle, '狂喜：你的攻击提升了 50%！', { kind: 'buff' }); },
+    () => { applyStatus(p, 'buff', 2, { stat: 'crit', mul: 5 }); emit(battle, '狂喜：你的暴击率大幅提升！', { kind: 'buff' }); },
+    () => {
+      const heal = Math.round(p.stats.maxHp * 0.12);
+      p.hp = Math.min(p.stats.maxHp, p.hp + heal);
+      emit(battle, `狂喜：你恢复了 ${heal} 点生命！`, { kind: 'heal' });
+    },
+  ];
+  const banes = [
+    () => {
+      const loss = Math.round(p.stats.maxHp * 0.08);
+      applyDamage(battle, p, loss, null);
+      emit(battle, `乐极生悲：你损失了 ${loss} 点生命。`, { kind: 'damage', target: 'player' });
+    },
+    () => { applyStatus(e, 'buff', 2, { stat: 'atk', mul: 1.3 }); emit(battle, '乐极生悲：敌人的攻击提升了 30%！', { kind: 'damage' }); },
+    () => {
+      const loss = Math.round(p.stats.maxMp * 0.15);
+      p.mp = Math.max(0, p.mp - loss);
+      emit(battle, `乐极生悲：你流失了 ${loss} 点灵力。`, { kind: 'damage' });
+    },
+  ];
+  battle.rng.pick(boons)();
+  battle.rng.pick(banes)();
+}
+
+function drainMp(battle, pct, label) {
+  const p = battle.player;
+  const loss = Math.min(p.mp, Math.round(p.stats.maxMp * pct));
+  if (loss > 0) {
+    p.mp -= loss;
+    emit(battle, `${label}：你流失了 ${loss} 点灵力。`, { kind: 'damage' });
+  }
+}
+
+function griefLoss(battle, pct, label) {
+  const p = battle.player;
+  const loss = Math.max(1, Math.round(p.stats.maxHp * pct));
+  applyDamage(battle, p, loss, null);
+  emit(battle, `${label}：你损失了 ${loss} 点生命。`, { kind: 'damage', target: 'player' });
+}
+
+// 每回合开始
+function ruleTurnStart(battle) {
+  if (!active(battle)) return;
+  if (battle.rule === 'joy') joyTurn(battle);
+  if (battle.rule === 'tiandao' && battle.turn % 4 === 0) {
+    const loss = Math.round(battle.player.stats.maxHp * 0.08);
+    applyDamage(battle, battle.player, loss, null);
+    emit(battle, `劫雷落下，你受到 ${loss} 点真实伤害！`, { kind: 'damage', target: 'player' });
+  }
+}
+
+// 每回合结束
+function ruleTurnEnd(battle) {
+  if (!active(battle)) return;
+  const { rule, enemy: e } = battle;
+  if (rule === 'worry') drainMp(battle, 0.15, '忧虑缠身');
+  if (rule === 'grief') griefLoss(battle, Math.min(0.3, 0.02 + 0.005 * (battle.turn - 1)), '悲从中来');
+  if (rule === 'tiandao') {
+    const ratio = e.hp / e.stats.maxHp;
+    const phase = ratio <= 0.33 ? 3 : ratio <= 0.66 ? 2 : 1;
+    if (phase > (e.flags.phase || 1)) {
+      e.flags.phase = phase;
+      if (phase === 2) emit(battle, '天道：规则篡改——你的五行克制失效，它周身浮现护盾。', { kind: 'info' });
+      if (phase === 3) {
+        applyStatus(e, 'buff', 999, { stat: 'atk', mul: 1.6 });
+        emit(battle, '天道：道心审判——它的攻击暴涨，心魔缠绕着你。', { kind: 'info' });
+      }
+    }
+    if ((e.flags.phase || 1) >= 2 && battle.turn % 3 === 0) {
+      const sh = Math.round(e.stats.maxHp * 0.08);
+      e.shield += sh;
+      emit(battle, `天道获得了 ${sh} 点护盾。`, { kind: 'shield' });
+    }
+    if (e.flags.phase === 3) {
+      const roll = battle.rng.int(0, 2);
+      if (roll === 0) drainMp(battle, 0.1, '心魔·忧');
+      else if (roll === 1) griefLoss(battle, 0.04, '心魔·悲');
+      else if (battle.player.mp > 0) drainMp(battle, 0.05, '心魔·惧');
+    }
+  }
+}
+
+// 行动前：返回 true 表示这次行动被打断
+function ruleInterrupt(battle, actor) {
+  if (!active(battle) || battle.rule !== 'shock' || actor !== battle.player) return false;
+  if (!battle.rng.chance(0.3)) return false;
+  const calm = (actor.flags.stacks && actor.flags.stacks.calm) || 0;
+  if (calm > 0) {
+    actor.flags.stacks.calm = calm - 1;
+    emit(battle, '定心抵挡住了惊扰。', { kind: 'buff' });
+    return false;
+  }
+  emit(battle, '你心神被惊扰，这回合的行动被打断了！', { kind: 'info' });
+  return true;
+}
+
+// 攻击是否落在幻象上
+function ruleMiss(battle, actor) {
+  if (!active(battle) || battle.rule !== 'illusion' || actor !== battle.player) return false;
+  if (!battle.rng.chance(0.35)) return false;
+  emit(battle, '你的攻击落在了幻象上，毫无效果！', { kind: 'info' });
+  return true;
+}
+
+// 使用丹药后
+function ruleOnItem(battle, actor) {
+  if (!active(battle) || battle.rule !== 'shock' || actor !== battle.player) return;
+  if (!actor.flags.stacks) actor.flags.stacks = {};
+  actor.flags.stacks.calm = (actor.flags.stacks.calm || 0) + 2;
+  emit(battle, '心神安定下来（定心 +2）。', { kind: 'buff' });
+}
+
+// 天道第二阶段起，五行克制失效
+function ruleNeutralElements(battle) {
+  return active(battle) && battle.rule === 'tiandao' && (battle.enemy.flags.phase || 1) >= 2;
+}
+
+return { RULE_INFO, initRule, ruleTurnStart, ruleTurnEnd, ruleInterrupt, ruleMiss, ruleOnItem, ruleNeutralElements };
+},
+"combat/autoplay.js": function () {
+const { SKILLS } = __req("data/skills.js");
+const { canAfford } = __req("combat/skills.js");
+
+// 敌人 AI：有灵力时 70% 概率施展功法，否则普攻
+function chooseEnemyAction(battle) {
+  const enemy = battle.enemy;
+  const options = enemy.skills.filter((id) => canAfford(enemy, id));
+  if (options.length && battle.rng.chance(0.7)) {
+    return { type: 'skill', skillId: battle.rng.pick(options) };
+  }
+  return { type: 'attack' };
+}
+
+// 辅助功法是否值得现在释放，避免自动战斗白白浪费回合
+function isUseful(unit, skill) {
+  if (skill.power > 0) return true;
+  return (skill.then || []).some((t) => {
+    const op = t.do.op;
+    if (op === 'heal') return unit.hp / unit.stats.maxHp < 0.7;
+    if (op === 'shield') return unit.shield <= 0;
+    if (op === 'buff') return !unit.statuses.some((s) => s.id === 'buff' && s.stat === t.do.stat);
+    if (op === 'mp') return unit.mp / unit.stats.maxMp < 0.5; // 回灵武学只在灵力不足一半时使用
+    return true;
+  });
+}
+
+// 自动战斗：config = { skillOrder:[功法id], pillHpThreshold }
+function chooseAutoAction(battle, config = {}) {
+  const cfg = { skillOrder: [], pillHpThreshold: 0.3, ...config };
+  const p = battle.player;
+  if (p.hp / p.stats.maxHp < cfg.pillHpThreshold && (p.items.hp_pill || 0) > 0) {
+    return { type: 'item', itemId: 'hp_pill' };
+  }
+  const order = cfg.skillOrder.length
+    ? cfg.skillOrder
+    : p.skills.slice().sort((a, b) => SKILLS[b].power - SKILLS[a].power);
+  for (const id of order) {
+    if (!p.skills.includes(id)) continue;
+    const skill = SKILLS[id];
+    if (canAfford(p, id) && isUseful(p, skill)) return { type: 'skill', skillId: id };
+  }
+  return { type: 'attack' };
+}
+
+return { chooseEnemyAction, chooseAutoAction };
+},
+"ui/dom.js": function () {
+// 极简 DOM 辅助：h('div', {class:'x', onclick:fn}, 子节点...)
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === false || v == null) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'disabled') el.disabled = true;
+    else if (k === 'value') el.value = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c == null || c === false) continue;
+    el.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+
+function mount(root, node) {
+  root.replaceChildren(node);
+}
+
+return { h, mount };
+},
+"ui/screens.js": function () {
+const { h } = __req("ui/dom.js");
+const { SECTS } = __req("data/sects.js");
+const { ROOTS, getQuality, describeRoot } = __req("data/roots.js");
+const { SKILLS, TAGS, SKILL_MAX_LEVEL } = __req("data/skills.js");
+const { ITEMS } = __req("data/items.js");
+const { SLOTS, SLOT_NAMES, RARITIES, RARITY_INFO, BAG_MAX, describeItem } = __req("data/equipment.js");
+const { HELP } = __req("data/help.js");
+const { GAME_NAME, VERSION, AUTHOR, SPONSOR, CREDITS } = __req("data/credits.js");
+const { SAVE_VERSION } = __req("engine/save.js");
+const { REALMS, realmName } = __req("data/realms.js");
+const { BOSS } = __req("data/world.js");
+const { bandAt } = __req("engine/world.js");
+const { atGate } = __req("engine/progress.js");
+const { STATUS_DEFS } = __req("combat/status.js");
+const { listActions, skillCost } = __req("combat/skills.js");
+const { LOADOUT_MAX } = __req("engine/state.js");
+const { shopEntryName } = __req("engine/shop.js");
+const { TRIALS, FINAL, SHARDS_NEEDED, ENDING } = __req("data/demon.js");
+const { RULE_INFO } = __req("combat/rules.js");
+const { canSummon, trialCleared } = __req("engine/demon.js");
+const { splitRarity } = __req("ui/richtext.js");
+
+const fmt = (n) => Math.round(n).toLocaleString('en-US');
+
+function meter(label, value, max, cls) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  const low = cls === 'hp' && pct > 0 && pct < 30; // 低血量时血条会轻轻闪动
+  return h('div', { class: 'meter' },
+    h('span', null, label),
+    h('div', {
+      class: 'track', role: 'progressbar', 'aria-label': label,
+      'aria-valuenow': Math.round(value), 'aria-valuemin': 0, 'aria-valuemax': max,
+    }, h('div', { class: `fill ${cls}${low ? ' low' : ''}`, style: `width:${pct}%` })),
+    h('span', { class: 'val' }, `${fmt(Math.max(0, value))}/${fmt(max)}`),
+  );
+}
+
+function statusTags(unit) {
+  const tags = [];
+  for (const s of unit.statuses) {
+    const def = STATUS_DEFS[s.id];
+    const good = s.id === 'buff';
+    const label = s.id === 'buff' ? `增益·${s.stat === 'atk' ? '攻' : s.stat}` : def ? def.name : s.id;
+    tags.push(h('span', { class: `tag ${good ? 'good' : 'bad'}` }, `${label} ${s.turns}`));
+  }
+  if (unit.shield > 0) tags.push(h('span', { class: 'tag good' }, `护盾 ${unit.shield}`));
+  return tags;
+}
+
+function rootLabel(rootId, qualityId) {
+  const q = getQuality(qualityId);
+  return h('span', { class: `root-name q-${q.id}` }, `${q.name}·${ROOTS[rootId].name}`);
+}
+
+function topbar(a, { bag = false } = {}) {
+  return h('header', { class: 'topbar' },
+    h('h1', { class: 'brand' }, '仙途轮回'),
+    h('div', { class: 'row tight' },
+      bag ? h('button', { class: 'icon-btn', 'aria-label': '行囊', onclick: a.openBag }, '🎒') : null,
+      h('button', { class: 'icon-btn', 'aria-label': '玩法说明', onclick: a.openHelp }, '?'),
+      h('button', { class: 'icon-btn', 'aria-label': '菜单', onclick: a.openMenu }, '☰')),
+  );
+}
+
+// 装备：名字按品质着色，如「🗡️ [橙]传世剑」；说明为「武器 · 橙品｜攻击 +20 · 嗜血：…」
+const itemName = (e) => h('span', { class: `gear-name r-${e.rarity}` }, `${e.icon} [${RARITY_INFO[e.rarity].name}]${e.name}`);
+// 文字里的「[橙]传世剑」按品质着色并加框；其余文字原样
+const rich = (text) => splitRarity(text).map((s) => (s.rarity ? h('span', { class: `gear-name r-${s.rarity}` }, s.text) : s.text));
+const equipLine = (e) => `${SLOT_NAMES[e.slot]} · ${RARITY_INFO[e.rarity].name}品｜${describeItem(e)}`;
+const levelOf = (p, id) => (p.skillLevels && p.skillLevels[id]) || 1;
+const skillLine = (p, s) => `${TAGS[s.tag]}${p.affinity === s.tag ? '（本宗擅长）' : ''} · 灵力 ${skillCost(p, s)}｜${s.desc}`;
+const byRarity = (a, b) => RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity) || b.price - a.price;
+// 与同部位已穿戴的装备比较（价格综合了品质和数值好坏）：空位 / ↑ 更好 / ↓ 更差
+const compareTag = (p, e) => {
+  const cur = p.equipment[e.slot];
+  if (!cur) return h('span', { class: 'tag good' }, '空位');
+  if (e.price > cur.price) return h('span', { class: 'tag good', title: '比身上的更好' }, '↑ 更好');
+  if (e.price < cur.price) return h('span', { class: 'tag bad', title: '不如身上的' }, '↓ 更差');
+  return null;
+};
+
+// ---------- 弹窗 ----------
+function bagBody(app, a) {
+  const d = app.dialog;
+  const p = app.save.run.player;
+  const sect = SECTS[p.sectId];
+  const tabs = [['equip', '装备'], ['skill', '武学'], ['sect', '宗门']];
+  let content;
+  if (d.tab === 'equip') {
+    content = [
+      h('h3', null, `已穿戴（${SLOTS.filter((s) => p.equipment[s]).length}/${SLOTS.length}）`),
+      SLOTS.map((slot) => {
+        const e = p.equipment[slot];
+        return h('div', { class: `item-row${e ? ` rar-${e.rarity}` : ''}` },
+          h('div', { class: 'item-info' },
+            h('b', null, `${SLOT_NAMES[slot]}：`, e ? itemName(e) : '空'),
+            e ? h('div', { class: 'muted' }, describeItem(e)) : null),
+          e ? h('button', { class: 'seal small', onclick: () => a.unequip(slot) }, '卸下') : null);
+      }),
+      h('h3', null, `行囊（${p.bag.equipment.length}/${BAG_MAX}）`),
+      p.bag.equipment.length
+        ? [...p.bag.equipment].sort(byRarity).map((e) =>
+          h('div', { class: `item-row rar-${e.rarity}` },
+            h('div', { class: 'item-info' }, h('b', null, itemName(e), ' ', compareTag(p, e)), h('div', { class: 'muted' }, equipLine(e))),
+            h('button', { class: 'seal small', onclick: () => a.equip(e.uid) }, '装备')))
+        : h('p', { class: 'muted' }, '行囊是空的。击败魔修、打开宝箱或向行商购买可以得到装备。'),
+      p.bag.equipment.length >= BAG_MAX ? h('p', { class: 'error' }, '行囊已满，新得到的装备会自动折算成金币。') : null,
+    ];
+  } else if (d.tab === 'skill') {
+    content = [
+      h('h3', null, `武学栏 ${p.skills.length}/${LOADOUT_MAX}`),
+      h('p', { class: 'muted' }, `战斗中只能使用已装备的武学。重复获得同一武学会升级（最高 Lv.${SKILL_MAX_LEVEL}，每级威力 +10%）。`),
+      p.learned.map((id) => {
+        const s = SKILLS[id];
+        const on = p.skills.includes(id);
+        return h('div', { class: 'item-row' },
+          h('div', { class: 'item-info' }, h('b', null, `${s.name} Lv.${levelOf(p, id)}`, on ? ' ✔' : ''), h('div', { class: 'muted' }, skillLine(p, s))),
+          h('button', { class: `seal small ${on ? 'on' : ''}`, onclick: () => a.toggleSkill(id) }, on ? '卸下' : '装备'));
+      }),
+    ];
+  } else {
+    const root = ROOTS[p.rootId];
+    content = [
+      h('h3', null, `${sect.icon} ${sect.name}`),
+      h('p', null, sect.desc),
+      h('p', null, h('b', null, '擅长：'), `${TAGS[sect.affinity]}类武学，灵力消耗 ×0.8（向上取整），威力 ×1.15。`),
+      h('p', null, h('b', null, `独门·${sect.passive.name}：`), sect.passive.desc),
+      h('h3', null, '灵根'),
+      h('p', null, rootLabel(p.rootId, p.rootQuality || 'pu'), ` ${describeRoot(root, p.rootQuality || 'pu')}`),
+    ];
+  }
+  return [
+    h('h2', null, '行囊'),
+    h('div', { class: 'tabs', role: 'tablist' }, tabs.map(([id, name]) =>
+      h('button', { class: 'tab', role: 'tab', 'aria-selected': String(d.tab === id), onclick: () => a.bagTab(id) }, name))),
+    d.msg ? h('p', { class: 'notice', role: 'status', style: 'margin:8px 0' }, rich(d.msg)) : null,
+    content,
+    h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '关闭')),
+  ];
+}
+
+function modal(app, a) {
+  const d = app.dialog;
+  if (!d) return null;
+  let body;
+  if (d.type === 'bag') {
+    body = bagBody(app, a);
+  } else if (d.type === 'help') {
+    body = [
+      h('h2', null, '玩法说明'),
+      HELP.map((sec) => [h('h3', null, sec.title), h('ul', null, sec.lines.map((l) => h('li', null, l)))]),
+      h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '知道了')),
+    ];
+  } else if (d.type === 'about') {
+    const sponsorUrl = /^https:\/\//.test(SPONSOR.url) ? SPONSOR.url : '';
+    body = [
+      h('h2', null, '关于 / 作者名单'),
+      h('p', null, h('b', null, GAME_NAME), ` v${VERSION}`, h('span', { class: 'muted' }, `（存档版本 ${SAVE_VERSION}）`)),
+      AUTHOR ? h('p', null, h('b', null, '作者：'), AUTHOR) : null,
+      CREDITS.map((sec) => [h('h3', null, sec.title), sec.lines.map((l) => h('p', null, l))]),
+      sponsorUrl
+        ? [h('h3', null, '支持作者'), h('p', null, '如果你喜欢这个游戏，可以请作者喝杯咖啡，感谢支持！'),
+          h('a', { class: 'seal small link', href: sponsorUrl, target: '_blank', rel: 'noopener noreferrer' }, `☕ ${SPONSOR.label}`)]
+        : null,
+      h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '关闭')),
+    ];
+  } else if (d.type === 'ending') {
+    const run = app.save.run;
+    const p = run.player;
+    body = [
+      h('h2', null, '结局 · 道心圆满'),
+      ENDING.map((l) => h('p', null, l)),
+      h('h3', null, '这一路'),
+      h('p', null, `${SECTS[p.sectId].name} · ${getQuality(p.rootQuality || 'pu').name}·${ROOTS[p.rootId].name}，走到第 ${run.depth.toLocaleString('en-US')} 层，斩杀 ${run.kills.toLocaleString('en-US')} 只妖兽与魔修，境界「${realmName(p.realm, p.stage)}」。`),
+      h('p', { class: 'muted' }, `通关次数：${app.save.meta.endings}　道果 +10（用途将在后续版本开放）`),
+      h('p', null, '你可以继续修行，向更深处走去。'),
+      h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '继续修行')),
+    ];
+  } else if (d.type === 'menu') {
+    body = [
+      h('h2', null, '菜单'),
+      h('div', { class: 'menu-list' },
+        h('button', { class: 'seal', onclick: a.openHelp }, '玩法说明'),
+        h('button', { class: 'seal', onclick: a.openAbout }, '关于 / 作者名单'),
+        h('button', { class: 'seal', onclick: a.openExport }, '导出存档码'),
+        h('button', { class: 'seal', onclick: a.openImport }, '导入存档码'),
+        app.save.run ? h('button', { class: 'seal', onclick: a.abandon }, '放弃本次修行') : null,
+        h('button', { class: 'seal primary', onclick: a.closeDialog }, '关闭')),
+    ];
+  } else if (d.type === 'export') {
+    body = [
+      h('h2', null, '导出存档码'),
+      h('p', { class: 'muted', style: 'margin-bottom:8px' }, '复制下面的存档码，换设备或清缓存后可用「导入」恢复。'),
+      h('textarea', { class: 'code', readonly: true, 'aria-label': '存档码', onfocus: (e) => e.target.select() }, d.code),
+      d.note ? h('p', { class: 'muted', style: 'margin-top:6px' }, d.note) : null,
+      h('div', { class: 'btns' },
+        h('button', { class: 'seal primary', onclick: a.copyCode }, '复制'),
+        h('button', { class: 'seal', onclick: a.closeDialog }, '关闭')),
+    ];
+  } else {
+    body = [
+      h('h2', null, '导入存档码'),
+      h('p', { class: 'muted', style: 'margin-bottom:8px' }, '导入会覆盖当前进度。'),
+      h('textarea', {
+        class: 'code', 'aria-label': '存档码', placeholder: '粘贴以 XT1. 开头的存档码',
+        oninput: (e) => { d.text = e.target.value; },
+      }, d.text || ''),
+      d.error ? h('p', { class: 'error', role: 'alert', style: 'margin-top:6px' }, d.error) : null,
+      h('div', { class: 'btns' },
+        h('button', { class: 'seal primary', onclick: a.doImport }, '导入'),
+        h('button', { class: 'seal', onclick: a.closeDialog }, '取消')),
+    ];
+  }
+  return h('div', { class: 'modal', onclick: (e) => { if (e.target === e.currentTarget) a.closeDialog(); } },
+    h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }, body));
+}
+
+// ---------- 入道：选宗门 + 刷灵根 ----------
+function renderSelect(app, a) {
+  const { sectId, root, rerolls } = app.selection;
+  const sect = sectId ? SECTS[sectId] : null;
+  const rootData = ROOTS[root.rootId];
+  const synergy = sect
+    ? sect.starterSkills.filter((id) => SKILLS[id].element === rootData.element).map((id) => SKILLS[id].name)
+    : [];
+  const followers = sect
+    ? sect.starterSkills.filter((id) => SKILLS[id].element === 'self' && SKILLS[id].power > 0).map((id) => SKILLS[id].name)
+    : [];
+  const synergyHint = synergy.length
+    ? h('p', { class: 'synergy' }, `同源：「${synergy.join('」「')}」威力 +20%`)
+    : sect
+      ? h('p', { class: 'muted' }, followers.length
+        ? `「${followers.join('」「')}」的属性跟随你的灵根，这个灵根暂无同源加成`
+        : '这个灵根与该宗门武学不同源，换一个更合适')
+      : h('p', { class: 'muted' }, '选好宗门后，这里会提示同源武学');
+  return h('section', { class: 'screen' },
+    topbar(a),
+    h('div', { class: 'panel' },
+      h('h2', null, '宗门'),
+      h('div', { class: 'grid3' }, Object.values(SECTS).map((s) =>
+        h('button', { class: 'card', 'aria-pressed': String(sectId === s.id), onclick: () => a.pickSect(s.id) },
+          h('span', { class: 'ico', 'aria-hidden': 'true' }, s.icon), s.name))),
+      h('p', { class: 'detail', style: 'margin-top:6px' },
+        sect
+          ? [h('b', null, sect.name), `：${sect.desc} 擅长${TAGS[sect.affinity]}。`, h('b', null, ` 独门·${sect.passive.name}`), `：${sect.passive.desc}`]
+          : '点选一个宗门，查看它擅长的武学类型和独门机制。'),
+    ),
+    h('div', { class: 'panel' },
+      h('div', { class: 'row spread' },
+        h('h2', { style: 'margin:0' }, '灵根'),
+        h('button', { class: 'seal small', onclick: a.reroll }, '🎲 刷新灵根')),
+      h('div', { style: 'margin:6px 0 2px' }, rootLabel(root.rootId, root.quality), ' ', h('span', { class: 'tag' }, `${rootData.element}属性`)),
+      h('p', { class: 'muted' }, describeRoot(rootData, root.quality) || '无属性加成'),
+      synergyHint,
+      h('p', { class: 'muted', style: 'margin-top:2px' }, `品质决定加成强弱（杂 < 普 < 优 < 天）。已刷新 ${rerolls} 次，可以一直刷到满意。`),
+    ),
+    app.notice ? h('p', { class: 'notice', role: 'status' }, app.notice) : null,
+    h('div', { class: 'grow' }),
+    h('button', { class: 'seal primary block', disabled: !sectId, onclick: a.begin }, sectId ? '入道' : '请先选择宗门'),
+  );
+}
+
+// ---------- 探索 ----------
+function renderExplore(app, a) {
+  const run = app.save.run;
+  const p = run.player;
+  const sect = SECTS[p.sectId];
+  const band = bandAt(run.depth);
+  const gate = atGate(run); // 站在区域尽头：要击败首领才能继续
+  const speeds = ['1×', '3×', '10×'];
+  return h('section', { class: 'screen' },
+    topbar(a, { bag: true }),
+    h('div', { class: 'panel' },
+      h('div', { class: 'row spread' },
+        h('div', { class: 'status-title' }, `${sect.icon} ${sect.name} · `, rootLabel(p.rootId, p.rootQuality || 'pu')),
+        h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
+      h('p', { class: 'muted', style: 'margin:2px 0 4px' }, `${band.name} · 第 ${fmt(run.depth)} 层 · 已斩 ${fmt(run.kills)} 只`),
+      meter('生命', p.hp, p.stats.maxHp, 'hp'),
+      meter('灵力', p.mp, p.stats.maxMp, 'mp'),
+      h('div', { class: 'muted' }, `攻 ${fmt(p.stats.atk)} · 防 ${fmt(p.stats.def)} · 身法 ${p.stats.spd} · 暴击 ${Math.round(p.stats.crit * 1000) / 10}% · `, h('span', { class: 'gold' }, `💰 ${fmt(p.gold)}`)),
+      statusTags(p).length ? h('div', { class: 'row tight' }, statusTags(p)) : null,
+    ),
+    h('div', { class: 'panel' },
+      h('div', { class: 'row tight' },
+        h('b', null, '武学'),
+        p.skills.length
+          ? p.skills.map((id) => h('span', { class: 'tag' }, `${SKILLS[id].name}${levelOf(p, id) > 1 ? ` Lv.${levelOf(p, id)}` : ''} ${skillCost(p, SKILLS[id])}`))
+          : h('span', { class: 'muted' }, '未装备，点 🎒 装备')),
+      h('div', { class: 'muted', style: 'margin-top:4px' }, `擅长${TAGS[sect.affinity]} · 独门「${sect.passive.name}」（详情见 🎒 宗门）`),
+    ),
+    h('div', { class: 'row' },
+      h('span', { class: 'muted' }, '丹药'),
+      Object.entries(p.items).map(([id, n]) =>
+        h('button', { class: 'seal small', disabled: n <= 0, title: ITEMS[id].desc, 'aria-label': `${ITEMS[id].name}，${ITEMS[id].desc}，剩 ${n} 颗`, onclick: () => a.useItemOutside(id) }, `${ITEMS[id].name} ×${n}`))),
+    app.notice ? h('p', { class: 'notice', role: 'status' }, rich(app.notice)) : null,
+    h('div', { class: 'log', role: 'log', 'aria-live': 'polite', 'aria-label': '历练记录' },
+      (run.journal || []).length
+        ? run.journal.map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, rich(l.text)))
+        : h('div', { class: 'ln info' }, '还没有历练记录，点「历练」出发。')),
+    h('div', { class: 'row' },
+      h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关'),
+      h('button', { class: 'seal small', 'aria-label': '自动历练倍速', onclick: a.cycleSpeed }, `速度 ${speeds[app.speed]}`),
+      (p.keys > 0 || (run.demon && run.demon.inside)) ? h('button', { class: 'seal small', onclick: a.openDemon }, `🗝 魔界 ×${p.keys || 0}`) : null),
+    gate
+      ? h('button', { class: 'seal primary block', onclick: a.breakthrough }, `突破 ${REALMS[p.realm]} → ${REALMS[p.realm + 1]}（挑战${BOSS.names[p.realm]}）`)
+      : h('button', { class: 'seal primary block', onclick: a.explore }, '历练'),
+  );
+}
+
+// ---------- 行商 ----------
+function renderShop(app, a) {
+  const run = app.save.run;
+  const p = run.player;
+  const shop = run.shop;
+  const entryInfo = (e) => {
+    if (e.kind === 'equip') return { name: h('span', null, itemName(e.item), ' ', compareTag(p, e.item)), desc: equipLine(e.item) };
+    if (e.kind === 'skill') {
+      const s = SKILLS[e.id];
+      const lv = p.learned.includes(e.id) ? levelOf(p, e.id) : 0;
+      const tip = lv === 0 ? '新武学' : lv >= SKILL_MAX_LEVEL ? `已满级 Lv.${lv}` : `已学 Lv.${lv}，买下升至 Lv.${lv + 1}`;
+      return { name: h('span', null, `📖 ${s.name}`), desc: `武学（${tip}）｜${skillLine(p, s)}` };
+    }
+    return { name: h('span', null, `💊 ${ITEMS[e.id].name}`, !e.sold ? ` （余 ${e.stock}）` : ''), desc: `药品｜${ITEMS[e.id].desc}` };
+  };
+  return h('section', { class: 'screen' },
+    h('header', { class: 'topbar' },
+      h('h1', { class: 'brand' }, '行商'),
+      h('div', { class: 'gold', style: 'font-size:18px' }, `💰 ${fmt(p.gold)}`)),
+    h('p', { class: 'muted' }, '路边的行商摊开货物，每次带的东西都不一样。'),
+    h('div', { class: 'shop grow' }, shop.map((e, i) => {
+      const info = entryInfo(e);
+      const maxed = e.kind === 'skill' && p.learned.includes(e.id) && levelOf(p, e.id) >= SKILL_MAX_LEVEL;
+      return h('div', { class: `item-row ${e.sold ? 'sold' : ''}${e.kind === 'equip' ? ` rar-${e.item.rarity}` : ''}` },
+        h('div', { class: 'item-info' }, h('b', null, info.name), h('div', { class: 'muted' }, info.desc)),
+        h('button', {
+          class: 'seal small', disabled: e.sold || maxed || p.gold < e.price,
+          'aria-label': `购买${shopEntryName(e)}，${e.price} 金币`, onclick: () => a.buy(i),
+        }, e.sold ? '已售' : maxed ? '满级' : `${fmt(e.price)} 金`));
+    })),
+    app.shopMsg ? h('p', { class: 'notice', role: 'status' }, rich(app.shopMsg)) : null,
+    h('button', { class: 'seal primary block', onclick: a.leaveShop }, '告辞'),
+  );
+}
+
+// ---------- 战斗 ----------
+function renderBattle(app, a) {
+  const b = app.battle;
+  const { player: p, enemy: e } = b;
+  const acts = listActions(p);
+  const manualLocked = app.auto || b.over;
+  const skillActs = acts.filter((x) => x.type === 'skill');
+  const itemActs = acts.filter((x) => x.type === 'item');
+  return h('section', { class: 'screen' },
+    h('div', { class: `panel enemy-row${e.isBoss || e.isFinal ? ' boss' : e.isTrial ? ' trial' : ''}` },
+      h('div', { class: `face${app.flash && app.flash.enemy ? ' hit' : ''}`, 'aria-hidden': 'true' }, e.icon),
+      h('div', null,
+        h('div', { class: 'ename' }, e.name, ' ', h('span', { class: 'tag' }, `${e.element}属性`), e.human ? h('span', { class: 'tag bad' }, '魔修') : null, e.isBoss ? h('span', { class: 'tag bad' }, '瓶颈首领') : null, b.rule ? h('span', { class: 'tag bad', title: RULE_INFO[b.rule].desc }, RULE_INFO[b.rule].name) : null),
+        b.rule === 'fear' ? h('div', { class: 'muted' }, '生命：？？？（被恐惧遮蔽了）') : meter('生命', e.hp, e.stats.maxHp, 'hp'),
+        statusTags(e).length ? h('div', { class: 'row tight' }, statusTags(e)) : null)),
+    h('div', { class: 'log', role: 'log', 'aria-live': 'polite', 'aria-label': '战斗日志' },
+      b.log.slice(-60).map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, l.text))),
+    h('div', { class: `panel${app.flash && app.flash.player ? ' hurt' : ''}` },
+      h('div', { class: 'row spread' },
+        h('strong', null, `${p.icon} ${p.name} `, h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
+        h('span', { class: 'tag' }, `第 ${b.turn} 回合`)),
+      meter('生命', p.hp, p.stats.maxHp, 'hp'),
+      meter('灵力', p.mp, p.stats.maxMp, 'mp'),
+      statusTags(p).length ? h('div', { class: 'row tight' }, statusTags(p)) : null),
+    b.over
+      ? h('div', { class: 'panel stack' },
+        h('h2', null, b.winner === 'player' ? '胜利' : b.enemy.isTrial ? '挑战失败' : '身死道消'),
+        a.resultText() ? h('p', { class: 'muted' }, rich(a.resultText())) : null,
+        h('button', { class: 'seal primary block', onclick: a.finish }, b.winner === 'player' ? (b.enemy.isTrial ? (b.enemy.isFinal ? '查看结局' : '返回魔界') : '继续历练') : b.enemy.isTrial ? '离开魔界' : '重入轮回'))
+      : [
+        h('div', { class: 'actions' },
+          h('button', { class: 'seal', disabled: manualLocked, onclick: () => a.act({ type: 'attack' }) }, '普攻'),
+          skillActs.map((s) => h('button', {
+            class: 'seal', disabled: manualLocked || !s.affordable, title: SKILLS[s.skillId].desc,
+            onclick: () => a.act({ type: 'skill', skillId: s.skillId }),
+          }, SKILLS[s.skillId].name, h('span', { class: 'cost' }, `${s.cost} 灵力${levelOf(p, s.skillId) > 1 ? ` · Lv.${levelOf(p, s.skillId)}` : ''}`))),
+          itemActs.map((s) => h('button', {
+            class: 'seal', disabled: manualLocked, title: ITEMS[s.itemId].desc,
+            onclick: () => a.act({ type: 'item', itemId: s.itemId }),
+          }, ITEMS[s.itemId].name, h('span', { class: 'cost' }, `×${s.count}`))),
+        ),
+        h('div', { class: 'row' },
+          h('button', { class: `seal small grow-btn ${app.auto ? 'on' : ''}`, 'aria-pressed': String(app.auto), onclick: a.toggleAuto }, app.auto ? '自动战斗：开' : '自动战斗：关'),
+          !b.enemy.isTrial ? h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关') : null),
+        h('div', { class: 'row spread' },
+          h('label', { class: 'muted' }, '生命低于 ',
+            h('select', { 'aria-label': '自动吃丹药的生命阈值', onchange: (ev) => a.setPillThreshold(Number(ev.target.value)) },
+              [[0, '不吃丹'], [0.3, '30%'], [0.5, '50%']].map(([v, t]) => h('option', { value: String(v), selected: app.autoConfig.pillHpThreshold === v }, t))),
+            ' 时自动吃回春丹')),
+      ],
+  );
+}
+
+// ---------- 魔界 ----------
+function renderDemon(app, a) {
+  const run = app.save.run;
+  const p = run.player;
+  const shards = run.demon.shards.length;
+  const summon = canSummon(run);
+  return h('section', { class: 'screen demon' },
+    h('header', { class: 'topbar' },
+      h('h1', { class: 'brand' }, '魔界'),
+      h('div', { class: 'muted' }, `心魔碎片 ${shards}/${SHARDS_NEEDED}`)),
+    h('p', { class: 'muted' }, '七情心魔劫：每个试炼有一个独特的规则。失败不会死，只是没有奖励，并被送出魔界。'),
+    meter('生命', p.hp, p.stats.maxHp, 'hp'),
+    h('div', { class: 'shop grow' },
+      TRIALS.map((t) => {
+        const done = trialCleared(run, t.id);
+        return h('div', { class: `item-row ${done ? 'sold' : ''}` },
+          h('div', { class: 'item-info' },
+            h('b', null, `${t.icon} ${t.name} · ${t.title}`, done ? ' ✔' : ''),
+            h('div', { class: 'muted' }, t.desc)),
+          h('button', { class: 'seal small', disabled: done, onclick: () => a.challengeTrial(t.id) }, done ? '已通过' : '挑战'));
+      }),
+      h('div', { class: `item-row ${run.demon.won ? 'sold' : ''}` },
+        h('div', { class: 'item-info' },
+          h('b', null, `${FINAL.icon} ${FINAL.name}`, run.demon.won ? ' ✔' : ''),
+          h('div', { class: 'muted' }, summon ? '七块碎片已集齐，道心已成，可以召唤终局首领。' : run.demon.won ? '你已击败过天道代行者。' : `需要集齐 ${SHARDS_NEEDED} 块碎片（现有 ${shards}）。`)),
+        h('button', { class: 'seal small', disabled: !summon, onclick: a.summonFinal }, run.demon.won ? '已通关' : '召唤'))),
+    h('button', { class: 'seal primary block', onclick: a.leaveDemon }, '离开魔界'),
+  );
+}
+
+function renderApp(app, a) {
+  let screen;
+  if (app.screen === 'battle') screen = renderBattle(app, a);
+  else if (app.screen === 'shop' && app.save.run && app.save.run.shop) screen = renderShop(app, a);
+  else if (app.screen === 'demon' && app.save.run) screen = renderDemon(app, a);
+  else if (app.screen === 'explore' && app.save.run) screen = renderExplore(app, a);
+  else screen = renderSelect(app, a);
+  return h('div', { class: 'shell' }, screen, modal(app, a));
+}
+
+return { rootLabel, renderSelect, renderExplore, renderShop, renderBattle, renderDemon, renderApp };
+},
+"data/help.js": function () {
+// 玩法说明：界面右上角「?」打开。每节 { title, lines:[文字] }
+const HELP = [
+  {
+    title: '怎么玩',
+    lines: [
+      '选宗门、刷灵根，点「入道」开始修行。',
+      '每点一次「历练」前进一层：可能遇到妖兽、魔修、行商，或找到营地休息回血。',
+      '战斗是回合制，打赢继续历练；生命归零则身死道消，需要重新入道。',
+      '探索界面中间的「历练记录」会保留最近的战斗过程、奖励、营地休息和购买记录，方便回看。',
+      '进度自动保存在本机浏览器，换设备请用菜单里的「导出存档」。',
+    ],
+  },
+  {
+    title: '深度与境界',
+    lines: [
+      '世界很深，共分 9 个区域：青云山脉 → 幽冥古墓 → 熔火地脉 → 东海龙宫 → 九天云阙 → 虚空裂隙 → 太初古境 → 渡劫雷海 → 无尽仙界，总共约 6500 层，之后是无尽。越往深处，敌人越强，金币和装备也越好。',
+      '层数就是境界：每个区域对应一个大境界，区域内每走过三分之一升一个小境界（前期 → 中期 → 后期），属性随之提升，不需要经验。',
+      '走到区域的最后一层，会出现「突破」按钮：要打赢一场区域首领，才能进入下一个区域、突破到下一个大境界。打不过就会身死道消，所以可以先休整、换装备、买药，准备好了再挑战。',
+      '前期升得很快（炼气期约 50 层一个小境界），越往后越慢，一个大境界可能要上千层。探索界面的「路程」条显示离区域尽头还有多远。',
+    ],
+  },
+  {
+    title: '魔界与七情心魔劫',
+    lines: [
+      '击败魔修有 5% 概率掉落「心魔钥匙」。探索界面出现「🗝 魔界」按钮后，进魔界会消耗一把钥匙。',
+      '魔界里有七个试炼：喜、怒、忧、思、悲、恐、惊，每个都有独特的战斗规则（例如：怒会让你攻击翻倍但防御归零，悲会让你每回合损失越来越多的生命），难度按你当前的境界来定。',
+      '通过一个试炼得 1 块心魔碎片、金币，和一件至少蓝品的装备。集齐 7 块碎片后，可以召唤终局首领「天道代行者」，打赢就是结局，之后可以继续修行。',
+      '挑战失败不会死：这次试炼没有奖励，你会被送出魔界，生命恢复到 30%，回到探索继续前进。已通过的试炼和碎片会保留，下次用新的钥匙再来。',
+    ],
+  },
+  {
+    title: '自动历练',
+    lines: [
+      '点「自动历练」后会自动前进、自动战斗、自动吃药，适合长时间挂机。「速度」可以切换 1×、3×、10×。',
+      '遇到行商、走到区域尽头要挑战首领、或生命过低又没有回春丹时，会自动暂停，等你处理。',
+      '行走也会慢慢恢复生命和灵力，战斗胜利后恢复得更多，营地休息最多。',
+    ],
+  },
+  {
+    title: '金币、行商与寻宝',
+    lines: [
+      '击败妖兽和魔修会获得金币。魔修是人形敌人，金币更多，还可能掉落装备和武学。',
+      '历练时有几率遇到行商，也可能发现宝箱。宝箱会随机开出金币、装备、武学或药品。',
+      '行商每次带的货都不一样：3 件随机装备、2 门武学、限量药品。刷新页面不会重新刷货。价格偏高，需要攒钱；丹修、商修有 9 折。',
+      '价格随你的境界上涨，同时你的金币收入也随境界增加。',
+    ],
+  },
+  {
+    title: '装备与品质',
+    lines: [
+      '装备分白、绿、蓝、紫、橙五档品质。每件装备的数值都是随机的，同品质也有好坏之分。',
+      '蓝、紫装带 1 条特殊词条，橙装带 2 条（嗜血、噬魂、聚财、凝神、反震）。',
+      '境界越高，越容易得到好装备：炼气期几乎都是白装，到了渡劫期橙装占大头。商人、魔修掉落、宝箱都按你当前的境界出货。',
+      '装备有 8 个部位：武器、衣服、护腕、鞋子、护符、玉佩、戒指、项链，每个部位穿一件。武器和衣服属性最强，其他部位属性小一些，但凑齐了很可观。',
+      '点探索界面右上角的 🎒 打开行囊穿戴装备。行囊里的装备会标出和身上同部位装备相比「↑ 更好」还是「↓ 更差」。行囊最多放 30 件，装不下的新装备会自动折算成金币。',
+    ],
+  },
+  {
+    title: '武学与升级',
+    lines: [
+      '武学栏最多 4 个，战斗中只能使用已装备的武学。所有宗门的武学和装备都通用。',
+      '商店和掉落不会避开你已经学会的武学，想刷到某一门要碰运气。',
+      '重复获得同一门武学会让它升级：最高 Lv.5，每级威力 +10%。已满级再获得会折算成金币。',
+    ],
+  },
+  {
+    title: '宗门的区别',
+    lines: [
+      '擅长：每个宗门擅长一类武学（剑诀、丹法、符箓、体术、幽冥、杂学）。使用本宗擅长的武学，灵力消耗 ×0.8（向上取整），威力 ×1.15。',
+      '独门机制：剑修叠剑意连击；丹修药效 +50%；符修符箓有概率不耗灵力；体修低血量时减伤并反震；鬼修击杀存魂；商修多赚金币。具体见入道页或 🎒 宗门。',
+    ],
+  },
+  {
+    title: '灵根有什么用',
+    lines: [
+      '灵根有两个部分：属性（金木水火土等）和品质（杂、普、优、天）。',
+      '属性决定五行克制：你的武学克制敌人属性时伤害 ×1.3，被敌人属性克制时伤害 ×0.75；敌人攻击你时同理。',
+      '品质决定灵根自带加成的强弱：杂 ×0.5、普 ×1、优 ×1.5、天 ×2.2。',
+      '同源加成：武学自带的元素与你的灵根相同时，威力 +20%（例如「丹火术」是火属性，配火灵根最强）。',
+      '部分武学（如「御剑诀」）属性不固定，会跟随你的灵根变化：没有同源加成，但五行克制照常生效。',
+      '灵根可以无限刷新，直到刷到你满意的为止。入道后就固定了。',
+      '雷、冰、风、暗是变异灵根，目前需要用道果解锁后才会刷出。',
+    ],
+  },
+  {
+    title: '五行相克',
+    lines: [
+      '金克木，木克土，土克水，水克火，火克金。',
+      '克制时伤害 ×1.3，被克制时 ×0.75，其余 ×1。变异属性暂无克制关系。',
+    ],
+  },
+  {
+    title: '战斗',
+    lines: [
+      '普攻：不耗灵力，威力 100%。',
+      '武学：消耗灵力，威力与特效各不相同，具体说明见 🎒 武学。',
+      '丹药：回春丹回复生命，聚灵丹回复灵力，用完为止。',
+      '身法高的一方先出手。暴击伤害默认 ×1.5。',
+      '自动战斗：打开后由系统按威力从高到低选武学，并在生命过低时自动吃回春丹，阈值可调。',
+    ],
+  },
+  {
+    title: '状态',
+    lines: [
+      '灼烧、中毒：每回合损失一部分最大生命。',
+      '冰封、定身：无法行动，跳过一次行动后解除。',
+      '护盾：先于生命吸收伤害。',
+      '增益：一定回合内提升属性。',
+    ],
+  },
+];
+
+return { HELP };
+},
+"data/credits.js": function () {
+// 「关于 / 作者名单」的内容。想改署名、赞助链接，只改这个文件。
+const GAME_NAME = '仙途轮回';
+const VERSION = '0.1.0';
+
+// 作者署名：留空则不显示这一行
+const AUTHOR = '';
+
+// 赞助入口：url 留空则不显示；填成 https:// 开头的链接后，会在作者名单里出现一个按钮
+const SPONSOR = { label: '请我喝杯咖啡', url: '' };
+
+// 名单正文：每节 { title, lines:[文字] }
+const CREDITS = [
+  {
+    title: '关于',
+    lines: [
+      '《仙途轮回》是一款水墨国风的修仙回合制冒险游戏，纯网页运行，没有服务器，也不收集任何数据。',
+      '进度只保存在你自己的浏览器里，请用菜单里的「导出存档」做好备份。',
+    ],
+  },
+  {
+    title: '灵感与原创声明',
+    lines: [
+      '玩法灵感来自 shota6666 的网页游戏《幻想冒險》：无限向下历练、里外两个世界、轮回重来这几个思路。',
+      '本作的世界观、文字、角色、数值、装备与武学设计、界面与全部代码均为原创，没有使用原作的任何文字、数据、图像或代码。',
+    ],
+  },
+  {
+    title: '感谢',
+    lines: ['感谢每一位试玩、提出意见的朋友。游戏还在不断更新，欢迎告诉我哪里不好玩。'],
+  },
+];
+
+return { GAME_NAME, VERSION, AUTHOR, SPONSOR, CREDITS };
+},
+"ui/richtext.js": function () {
+// 把文字里的「[橙]传世剑」这类装备名切出来，供界面按品质着色。不依赖 DOM，便于测试
+const { RARITIES, RARITY_INFO } = __req("data/equipment.js");
+
+const NAME_TO_KEY = Object.fromEntries(RARITIES.map((r) => [RARITY_INFO[r].name, r]));
+const RE = new RegExp(`\\[(${RARITIES.map((r) => RARITY_INFO[r].name).join('|')})\\]([^\\s、；，。：:（）()「」\\[\\]]+)`, 'g');
+
+// 返回片段数组：{ text } 为普通文字，{ text, rarity } 为一件装备的名字（rarity 是品质键，如 'mythic'）
+function splitRarity(text) {
+  const out = [];
+  const s = String(text);
+  let last = 0;
+  let m;
+  RE.lastIndex = 0;
+  while ((m = RE.exec(s))) {
+    if (m.index > last) out.push({ text: s.slice(last, m.index) });
+    out.push({ text: m[0], rarity: NAME_TO_KEY[m[1]] });
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push({ text: s.slice(last) });
+  return out;
+}
+
+return { splitRarity };
+}
+};
+const __cache = {};
+function __req(id) {
+  if (!__cache[id]) {
+    if (!__defs[id]) throw new Error('模块不存在: ' + id);
+    __cache[id] = {};
+    __cache[id] = __defs[id]();
+  }
+  return __cache[id];
+}
+__req("main.js");
+})();
+</script>
+</body>
+</html>
