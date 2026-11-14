@@ -557,6 +557,15 @@ body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent
 .codex-name { font-weight: 700; margin-top: 2px; }
 .codex-name .tag { margin-left: 3px; padding: 0 4px; font-size: 10px; }
 
+/* ---------- 战斗飘字与节奏 ---------- */
+.has-pops { position: relative; }
+.pop-layer { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 5; }
+.pop { position: absolute; top: 18%; font-weight: 800; font-size: 20px; letter-spacing: 0.02em; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 0 6px rgba(0,0,0,0.35); animation: popfloat 0.95s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.pop.dmg { color: #ff5a46; }
+.pop.heal { color: #6fd9a6; }
+.pop.crit { color: #ffd24a; font-size: 26px; text-shadow: 0 0 10px rgba(255, 190, 60, 0.8), 0 1px 0 rgba(0,0,0,0.6); }
+@keyframes popfloat { 0% { opacity: 0; transform: translateY(8px) scale(0.6); } 15% { opacity: 1; transform: translateY(-4px) scale(1.25); } 35% { transform: translateY(-14px) scale(1); } 100% { opacity: 0; transform: translateY(-46px) scale(1); } }
+
 </style>
 </head>
 <body>
@@ -572,7 +581,9 @@ const { bgSrc } = __req("ui/portrait.js");
 const { settleRun, startNextCycle, buyUpgrade, buyRoot, daoGain } = __req("engine/dao.js");
 const { FAVICON } = __req("data/art.js");
 const { resolveCave, pickThiefKind, createSwindle, resolveSwindle, thiefEncounter, npcOf, merchantLoyalty } = __req("engine/events.js");
-const { entryLine, killLine, pickLine, BAND_REST, BAND_TREASURE, SWINDLER_TEXT, fill } = __req("data/flavor.js");
+const { BATTLE_TICK_MS, EXPLORE_TICK_MS } = __req("data/pace.js");
+const { popsFromLog } = __req("ui/pops.js");
+const { entryLine, killLine, pickLine, BAND_REST, BAND_TREASURE, SWINDLER_TEXT, fill, merchantFarewell } = __req("data/flavor.js");
 const { recordKill, recordDrop, bump, checkAchievements } = __req("engine/achievements.js");
 const { makeHeirloom, heirloomCandidates } = __req("engine/heirloom.js");
 const { itemTitle } = __req("data/equipment.js");
@@ -648,6 +659,7 @@ const app = {
   shopTab: 'buy', // 行商界面：buy 购买 / sell 出售
   sellPick: ['common', 'uncommon'], // 一键出售勾选的品质
   toasts: [], // 屏幕上方的短暂提示（稀有掉落、成就、被偷……）
+  pops: [], // 战斗飘字（伤害、治疗数字）
   notice: loaded.error
     ? `存档读取失败：${loaded.error}。原存档没有被覆盖，你可以先导出它再开始新修行。`
     : storage.volatile ? '当前浏览器禁止本地存储，进度不会保留，请先导出存档码。' : '',
@@ -710,7 +722,7 @@ function scheduleAuto() {
   autoTimer = setTimeout(() => {
     if (!app.auto || !app.battle || app.battle.over) return;
     actions.act(chooseAutoAction(app.battle, app.autoConfig));
-  }, delay(450));
+  }, delay(BATTLE_TICK_MS));
 }
 
 // 背包/商店等对玩家数据的改动后统一存档并重绘
@@ -729,7 +741,7 @@ function stopAutoExplore(msg) {
 
 function scheduleExplore() {
   clearTimeout(exploreTimer);
-  if (app.autoExplore) exploreTimer = setTimeout(tickExplore, delay(500));
+  if (app.autoExplore) exploreTimer = setTimeout(tickExplore, delay(EXPLORE_TICK_MS));
 }
 
 function tickExplore() {
@@ -847,6 +859,7 @@ const actions = {
     if (event.id === 'merchant') {
       const loyalty = merchantLoyalty(npcOf(run));
       run.shop = generateShop(app.rng, run.player, { loyalty });
+      run.shopVisit = { bought: 0, sold: 0 }; // 这次逛店买了几件、卖了几件（告别时据此被夸或被骂）
       appendJournal(run, [
         { text: `—— 第 ${run.depth} 层 · 行商 ——`, kind: 'head' },
         { text: loyalty < 1 ? `行商一眼认出了你：“又是老主顾！给您算${loyalty <= 0.9 ? '九' : '九五'}折。”` : '你在路边遇到一位行商，他摊开了货物。', kind: 'info' },
@@ -1008,7 +1021,7 @@ const actions = {
     const run = app.save.run;
     const r = buyFromShop(run.player, run.shop, index);
     app.shopMsg = r.msg;
-    if (r.ok) { npcOf(run).merchant.bought += 1; appendJournal(run, [{ text: `🛒 ${r.msg}`, kind: 'gold' }]); }
+    if (r.ok) { npcOf(run).merchant.bought += 1; if (run.shopVisit) run.shopVisit.bought += 1; appendJournal(run, [{ text: `🛒 ${r.msg}`, kind: 'gold' }]); }
     commit();
   },
   setShopTab(tab) { app.shopTab = tab; app.shopMsg = ''; render(); },
@@ -1024,7 +1037,7 @@ const actions = {
       r = sellLearnedSkill(p, id);
     } else r = sellPill(p, id, pillPrice(ITEMS[id], p.realm || 0));
     app.shopMsg = r.msg;
-    if (r.ok) appendJournal(run, [{ text: `${r.msg}`, kind: 'gold' }]);
+    if (r.ok) { if (run.shopVisit) run.shopVisit.sold += 1; appendJournal(run, [{ text: `${r.msg}`, kind: 'gold' }]); }
     commit();
   },
   // 一键出售：勾选要卖的品质（白/绿/蓝/紫/黄/橙），再点出售。包含紫品及以上时会先确认
@@ -1041,7 +1054,7 @@ const actions = {
       && !window.confirm('勾选里包含紫、黄或橙品装备，确定一起卖掉吗？卖掉后无法找回。')) return;
     const r = sellJunk(run.player, picked);
     app.shopMsg = r.msg;
-    if (r.ok) appendJournal(run, [{ text: `${r.msg}`, kind: 'gold' }]);
+    if (r.ok) { if (run.shopVisit) run.shopVisit.sold += r.n || 1; appendJournal(run, [{ text: `${r.msg}`, kind: 'gold' }]); }
     commit();
   },
   // 行囊里研读秘籍：学会新武学或升级，由玩家决定
@@ -1056,7 +1069,10 @@ const actions = {
     run.shop = null;
     app.shopMsg = '';
     app.shopTab = 'buy';
-    appendJournal(run, [{ text: '你告别了行商，继续赶路。', kind: 'info' }]);
+    const bye = merchantFarewell(run.shopVisit, run.depth);
+    run.shopVisit = null;
+    appendJournal(run, [{ text: '你告别了行商，继续赶路。', kind: 'info' }, ...(bye ? [{ text: bye.text, kind: bye.rude ? 'damage' : 'gold' }] : [])]);
+    if (bye && bye.rude) { bump(app.save.meta, 'insults'); toast(`💢 ${bye.text.replace(/^行商/, '行商：').slice(0, 40)}${bye.text.length > 40 ? '…' : ''}`, 'bad'); }
     app.screen = 'explore';
     commit();
   },
@@ -1084,7 +1100,10 @@ const actions = {
     if (!b || b.over) return;
     const enemyHp = b.enemy.hp;
     const playerHp = b.player.hp;
+    const logFrom = b.log.length;
     step(b, action);
+    const now = Date.now();
+    app.pops = [...app.pops.filter((q) => now - q.t0 < 1500), ...popsFromLog(b.log.slice(logFrom)).map((q) => ({ ...q, id: ++toastSeq, t0: now }))];
     app.flash = { enemy: b.enemy.hp < enemyHp, player: b.player.hp < playerHp }; // 受击时抖动/闪红，只在这一次渲染里生效
     render();
     app.flash = null;
@@ -2743,6 +2762,7 @@ function createNewRun({ sectId, rootId, quality = 'pu', seed, cycle = 1, dao = {
     shop: null, // 正在逛的商人库存（刷新页面不会重新刷货）
     cave: null, // 洞府奇遇的待选状态（刷新页面后仍要选）
     swindle: null, // 女骗子的待决状态：{ price, real, sees, mode }
+    shopVisit: null, // 这次逛行商买了几件、卖了几件
     npc: null, // 回头客的记忆：被偷走的东西、被骗的元宝、在行商处的购买次数（用 npcOf 读取）
     rngState: seed >>> 0,
   };
@@ -3097,7 +3117,40 @@ const SWINDLER_TEXT = {
   backfired: '你指着她说“你是骗子”，她却哭天抢地说你冤枉好人，围观群众还让你赔了 {loss} 元宝。你：“我他妈……”',
 };
 
-return { BAND_ENTRY, BAND_REST, BAND_TREASURE, MONSTER_ENTRY, MONSTER_KILL, BOSS_ENTRY, BOSS_KILL, pickLine, entryLine, killLine, fill, THIEF_TEXT, SWINDLER_NAMES, SWINDLER_TEXT };
+// ---------- 行商告别：什么都没买会被骂，买了东西会被夸 ----------
+const MERCHANT_LEAVE = {
+  nothing: [ // 没买也没卖：骂得越离谱越好
+    '行商冲你的背影啐了一口：“去你妈的死穷b！”',
+    '行商冲你的背影啐了一口：“去你妈的死穷b！”', // 出现两次，让这句更常见
+    '行商把摊子一收，翻了个白眼：“没钱你逛什么逛？浪费老子口水！”',
+    '行商朝你扔了个鸡蛋：“穷鬼！下次再来我放狗！”',
+    '行商叉着腰骂：“看了半天一件不买，你是来蹭灯的吗？”',
+    '行商小声嘀咕，声音却大得全街都听见：“又是个看热闹的，晦气，呸呸呸！”',
+    '行商指着你的背影：“买不起就别摸！我这是正经生意！”',
+    '行商气得直拍大腿：“老子给你介绍了半天，你连个屁都不买？去你妈的！”',
+    '行商冲你比了个手势，虽然这个世界里没人知道那是什么意思，但你就是觉得不是好话。',
+    '行商喊道：“走好不送！下次带钱来，别只带嘴！”',
+  ],
+  soldOnly: [ // 只卖了东西给他、没买他的货
+    '行商收了你的东西，却一件货也没卖给你，还嘟囔：“只进不出，你是貔貅投胎吗？”',
+    '行商数着钱笑嘻嘻：“多谢惠顾！下次记得买点啥，我这又不是收破烂的。”',
+  ],
+  bought: [ // 买了东西
+    '行商笑得合不拢嘴：“慢走您嘞！下次还来啊！”',
+    '行商把你一路送出三里地：“您就是我亲爹！”',
+    '行商朝你的背影作揖：“客官慢走，小的给您烧香了！”',
+  ],
+};
+
+// 告别的话。visit = { bought, sold }；返回 { text, rude }。买了东西时只有三分之一的几率多说一句
+function merchantFarewell(visit, depth) {
+  const v = visit || { bought: 0, sold: 0 };
+  if (v.bought > 0) return depth % 3 === 0 ? { text: pickLine(MERCHANT_LEAVE.bought, depth, 'thanks'), rude: false } : null;
+  if (v.sold > 0) return { text: pickLine(MERCHANT_LEAVE.soldOnly, depth, 'sold'), rude: true };
+  return { text: pickLine(MERCHANT_LEAVE.nothing, depth, 'nothing'), rude: true };
+}
+
+return { BAND_ENTRY, BAND_REST, BAND_TREASURE, MONSTER_ENTRY, MONSTER_KILL, BOSS_ENTRY, BOSS_KILL, pickLine, entryLine, killLine, fill, THIEF_TEXT, SWINDLER_NAMES, SWINDLER_TEXT, MERCHANT_LEAVE, merchantFarewell };
 },
 "engine/economy.js": function () {
 // 经济核算：用事件权重和怪物元宝算出「每层历练的期望元宝收入」，定价都以它为基准
@@ -3147,12 +3200,44 @@ const REGIONS = Object.fromEntries(BANDS.map((b) => [b.id, { id: b.id, name: b.n
 
 return { EVENTS, REGIONS };
 },
+"data/pace.js": function () {
+// 节奏：固定的速度，玩家不能调。比最初的 1× 快（回合 450ms → 240ms），又不至于瞬间结束
+// 一场战斗约 6~7 回合，大约 1.5 秒；一层（含前进和战后）约 2.5 秒
+const BATTLE_TICK_MS = 240; // 自动战斗：每回合间隔
+const EXPLORE_TICK_MS = 300; // 自动历练：前进、战后结算的间隔
+
+return { BATTLE_TICK_MS, EXPLORE_TICK_MS };
+},
+"ui/pops.js": function () {
+// 战斗飘字：从新增的战斗日志里取出伤害和治疗数值，在对应的头像/面板上飘起来
+// 同一回合里的多个数字错开出现（玩家出手 → 敌人还击），形成一拍一拍的节奏
+const POP_LIFE_MS = 950;
+const POP_BEAT_MS = 150;
+
+function popsFromLog(entries) {
+  const pops = [];
+  for (const e of entries) {
+    if (!(e.amount > 0) || !e.target) continue;
+    if (e.kind !== 'damage' && e.kind !== 'heal') continue;
+    pops.push({
+      on: e.target === 'enemy' ? 'enemy' : 'player',
+      text: `${e.kind === 'heal' ? '+' : '-'}${e.amount.toLocaleString('en-US')}`,
+      kind: e.kind === 'heal' ? 'heal' : 'dmg',
+      crit: !!e.crit,
+      delay: Math.min(pops.length, 4) * POP_BEAT_MS,
+    });
+  }
+  return pops;
+}
+
+return { POP_LIFE_MS, POP_BEAT_MS, popsFromLog };
+},
 "engine/achievements.js": function () {
 // 永久统计与成就：每次击杀、掉落、奇遇都记进 meta.stats，成就达成立刻发放道果
 const { ACHIEVEMENTS } = __req("data/achievements.js");
 const { MONSTERS } = __req("data/monsters.js");
 
-const newStats = () => ({ kills: 0, best: 0, drops: {}, thefts: 0, caught: 0, fakes: 0, reals: 0, caves: 0, trials: 0, monsters: {}, maxSkill: 1 });
+const newStats = () => ({ kills: 0, best: 0, drops: {}, thefts: 0, caught: 0, fakes: 0, reals: 0, insults: 0, caves: 0, trials: 0, monsters: {}, maxSkill: 1 });
 
 // 读取 meta.stats（旧存档没有则补上，缺字段补默认）
 function stats(meta) {
@@ -3182,7 +3267,7 @@ function snapshot(meta, ctx = {}) {
   st.best = Math.max(st.best || 0, ctx.depth || 0);
   if (ctx.maxSkill) st.maxSkill = Math.max(st.maxSkill || 1, ctx.maxSkill);
   return {
-    depth: st.best, kills: st.kills, drops: st.drops, thefts: st.thefts, caught: st.caught, fakes: st.fakes || 0, reals: st.reals || 0, caves: st.caves,
+    depth: st.best, kills: st.kills, drops: st.drops, thefts: st.thefts, caught: st.caught, fakes: st.fakes || 0, reals: st.reals || 0, insults: st.insults || 0, caves: st.caves,
     trials: st.trials, endings: meta.endings || 0, rebirths: meta.rebirths || 0, maxSkill: st.maxSkill || 1,
     dex: Object.keys(st.monsters).length, dexAll: Object.keys(MONSTERS).length,
   };
@@ -3206,7 +3291,7 @@ return { newStats, stats, recordKill, recordDrop, bump, snapshot, checkAchieveme
 },
 "data/achievements.js": function () {
 // 成就：达成后立即获得道果。条件看 meta.stats（永久统计）与当前层数。前期的里程碑密一些，让头几分钟就有反馈
-// s = { depth, kills, drops:{rarity:n}, thefts, caught, fakes, reals, caves, trials, endings, rebirths, dex(见过几种怪), dexAll(怪物总数), maxSkill }
+// s = { depth, kills, drops:{rarity:n}, thefts, caught, fakes, reals, insults, caves, trials, endings, rebirths, dex(见过几种怪), dexAll(怪物总数), maxSkill }
 const ACHIEVEMENTS = [
   // 深度
   { id: 'd10', group: '深度', name: '初出茅庐', desc: '走到第 10 层', dao: 1, test: (s) => s.depth >= 10 },
@@ -3237,6 +3322,8 @@ const ACHIEVEMENTS = [
   { id: 'caught', group: '奇遇', name: '捉贼', desc: '当场擒住神偷', dao: 3, test: (s) => s.caught >= 1 },
   { id: 'fake', group: '奇遇', name: '识人不明', desc: '从女骗子手里买到一件赝品', dao: 1, test: (s) => s.fakes >= 1 },
   { id: 'real', group: '奇遇', name: '慧眼识珠', desc: '从女骗子手里买到真品', dao: 3, test: (s) => s.reals >= 1 },
+  { id: 'insult1', group: '奇遇', name: '死穷鬼', desc: '逛了行商的摊子却什么也没买，被他骂了一顿', dao: 1, test: (s) => s.insults >= 1 },
+  { id: 'insult20', group: '奇遇', name: '资深穷鬼', desc: '累计被行商骂过 20 次', dao: 5, test: (s) => s.insults >= 20 },
   { id: 'cave', group: '奇遇', name: '洞府寻宝', desc: '进入一次洞府奇遇', dao: 2, test: (s) => s.caves >= 1 },
   // 魔界与轮回
   { id: 'trial1', group: '魔界', name: '心魔初破', desc: '通过第一个魔界试炼', dao: 5, test: (s) => s.trials >= 1 },
@@ -4024,7 +4111,7 @@ function endTurn(battle) {
     const { dots } = tickEnd(unit);
     for (const d of dots) {
       applyDamage(battle, unit, d.amount, null);
-      emit(battle, `${unit.name} 受「${d.name}」折磨，损失 ${d.amount} 点生命`, { kind: 'damage', target: unit.side });
+      emit(battle, `${unit.name} 受「${d.name}」折磨，损失 ${d.amount} 点生命`, { kind: 'damage', target: unit.side, amount: d.amount });
       if (unit.dead) break;
     }
     if (!unit.dead) {
@@ -4165,7 +4252,7 @@ const OPS = {
     const before = unit.hp;
     unit.hp = Math.min(unit.stats.maxHp, unit.hp + amount);
     const gained = unit.hp - before;
-    if (gained > 0) emit(ctx.battle, `${unit.name} 恢复了 ${gained} 点生命`, { kind: 'heal' });
+    if (gained > 0) emit(ctx.battle, `${unit.name} 恢复了 ${gained} 点生命`, { kind: 'heal', target: unit.side, amount: gained });
   },
   mp(ctx, p) {
     const unit = pickUnit(ctx, p, 'self');
@@ -4180,7 +4267,7 @@ const OPS = {
     if (!unit || unit.dead) return;
     const amount = p.flat !== undefined ? p.flat : Math.round(getStat(ctx.source, 'atk') * (p.pct || 0));
     const dealt = applyDamage(ctx.battle, unit, amount, ctx.source);
-    emit(ctx.battle, `${ctx.source.name} 的效果令 ${unit.name} 受到 ${dealt} 点伤害`, { kind: 'damage' });
+    emit(ctx.battle, `${ctx.source.name} 的效果令 ${unit.name} 受到 ${dealt} 点伤害`, { kind: 'damage', target: unit.side, amount: dealt });
   },
   status(ctx, p) {
     const unit = pickUnit(ctx, p, 'foe');
@@ -4357,7 +4444,7 @@ function useSkill(battle, actor, target, skill) {
     emit(
       battle,
       `${actor.name} ${skill.id === 'basic' ? '发动攻击' : `施展「${skill.name}」`}，${crit ? '暴击！' : ''}对 ${target.name} 造成 ${amount} 点伤害${note}`,
-      { kind: 'damage', crit, target: target.side },
+      { kind: 'damage', crit, target: target.side, amount },
     );
     fireTrigger(battle, 'attack', actor, target, { dealt });
   } else {
@@ -4451,7 +4538,7 @@ function joyTurn(battle) {
     () => {
       const loss = Math.round(p.stats.maxHp * 0.08);
       applyDamage(battle, p, loss, null);
-      emit(battle, `乐极生悲：你损失了 ${loss} 点生命。`, { kind: 'damage', target: 'player' });
+      emit(battle, `乐极生悲：你损失了 ${loss} 点生命。`, { kind: 'damage', target: 'player', amount: loss });
     },
     () => { applyStatus(e, 'buff', 2, { stat: 'atk', mul: 1.3 }); emit(battle, '乐极生悲：敌人的攻击提升了 30%！', { kind: 'damage' }); },
     () => {
@@ -4477,7 +4564,7 @@ function griefLoss(battle, pct, label) {
   const p = battle.player;
   const loss = Math.max(1, Math.round(p.stats.maxHp * pct));
   applyDamage(battle, p, loss, null);
-  emit(battle, `${label}：你损失了 ${loss} 点生命。`, { kind: 'damage', target: 'player' });
+  emit(battle, `${label}：你损失了 ${loss} 点生命。`, { kind: 'damage', target: 'player', amount: loss });
 }
 
 // 每回合开始
@@ -4487,7 +4574,7 @@ function ruleTurnStart(battle) {
   if (battle.rule === 'tiandao' && battle.turn % 4 === 0) {
     const loss = Math.round(battle.player.stats.maxHp * 0.08);
     applyDamage(battle, battle.player, loss, null);
-    emit(battle, `劫雷落下，你受到 ${loss} 点真实伤害！`, { kind: 'damage', target: 'player' });
+    emit(battle, `劫雷落下，你受到 ${loss} 点真实伤害！`, { kind: 'damage', target: 'player', amount: loss });
   }
 }
 
@@ -4660,6 +4747,7 @@ const { CAVE_OPTIONS } = __req("engine/events.js");
 const { SWINDLER_TEXT, fill } = __req("data/flavor.js");
 const { heirloomCandidates, HEIRLOOM_BONUS } = __req("engine/heirloom.js");
 const { stats: metaStats } = __req("engine/achievements.js");
+const { POP_LIFE_MS } = __req("ui/pops.js");
 const { equipSellPrice, bookSellPrice, skillSellPrice, sellPrice } = __req("engine/inventory.js");
 const { pillPrice } = __req("engine/loot.js");
 const { canSummon, trialCleared } = __req("engine/demon.js");
@@ -5184,6 +5272,15 @@ function renderShop(app, a) {
 }
 
 // ---------- 战斗 ----------
+// 飘字：每次重绘都重建元素，用负的 animation-delay 接着上次的进度播放
+function popLayer(app, side) {
+  const now = Date.now();
+  const mine = (app.pops || []).filter((q) => q.on === side && now - q.t0 < POP_LIFE_MS + 400);
+  if (!mine.length) return null;
+  return h('div', { class: 'pop-layer', 'aria-hidden': 'true' }, mine.map((q) =>
+    h('span', { class: `pop ${q.kind}${q.crit ? ' crit' : ''}`, style: `left:${22 + ((q.id * 37) % 56)}%;animation-delay:${q.delay - (now - q.t0)}ms` }, q.crit ? `暴击 ${q.text}` : q.text)));
+}
+
 function renderBattle(app, a) {
   const b = app.battle;
   const { player: p, enemy: e } = b;
@@ -5192,7 +5289,8 @@ function renderBattle(app, a) {
   const skillActs = acts.filter((x) => x.type === 'skill');
   const itemActs = acts.filter((x) => x.type === 'item');
   return h('section', { class: 'screen' },
-    h('div', { class: `panel enemy-row${e.isBoss || e.isFinal ? ' boss' : e.isTrial ? ' trial' : ''}` },
+    h('div', { class: `panel enemy-row has-pops${e.isBoss || e.isFinal ? ' boss' : e.isTrial ? ' trial' : ''}` },
+      popLayer(app, 'enemy'),
       h('div', { class: `face${portraitSrc(e) ? ` art${portraitFull(e) ? ' full' : ''}` : ''}${app.flash && app.flash.enemy ? ' hit' : ''}`, 'aria-hidden': 'true' },
         portraitSrc(e) ? h('img', { src: portraitSrc(e), alt: '', draggable: 'false' }) : e.icon),
       h('div', null,
@@ -5201,7 +5299,8 @@ function renderBattle(app, a) {
         statusTags(e).length ? h('div', { class: 'row tight' }, statusTags(e)) : null)),
     h('div', { class: 'log', role: 'log', 'aria-live': 'polite', 'aria-label': '战斗日志' },
       b.log.slice(-60).map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, l.text))),
-    h('div', { class: `panel${app.flash && app.flash.player ? ' hurt' : ''}` },
+    h('div', { class: `panel has-pops${app.flash && app.flash.player ? ' hurt' : ''}` },
+      popLayer(app, 'player'),
       h('div', { class: 'row spread' },
         h('strong', null, `${p.icon} ${p.name} `, h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
         h('span', { class: 'row tight' }, goldBadge(p), h('span', { class: 'tag' }, `第 ${b.turn} 回合`))),
