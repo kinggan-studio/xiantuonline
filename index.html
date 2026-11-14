@@ -558,13 +558,17 @@ body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent
 .codex-name .tag { margin-left: 3px; padding: 0 4px; font-size: 10px; }
 
 /* ---------- 战斗飘字与节奏 ---------- */
-.has-pops { position: relative; }
-.pop-layer { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 5; }
-.pop { position: absolute; top: 18%; font-weight: 800; font-size: 20px; letter-spacing: 0.02em; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 0 6px rgba(0,0,0,0.35); animation: popfloat 0.95s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+/* 叠在战斗记录区上：怪物受伤飘在中上，玩家受伤飘在中下，大号字，手机上一眼能看到 */
+.log-wrap { position: relative; flex: 1 1 80px; min-height: 72px; display: flex; flex-direction: column; }
+.log-wrap > .log { flex: 1 1 auto; min-height: 0; }
+.pop-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.pop { position: absolute; transform: translateX(-50%); font-weight: 900; font-size: 56px; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; -webkit-text-stroke: 2.5px rgba(0, 0, 0, 0.6); paint-order: stroke fill; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); animation: popfloat 1s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.pop.on-enemy { top: 8%; }
+.pop.on-player { top: 52%; }
 .pop.dmg { color: #ff5a46; }
 .pop.heal { color: #6fd9a6; }
-.pop.crit { color: #ffd24a; font-size: 26px; text-shadow: 0 0 10px rgba(255, 190, 60, 0.8), 0 1px 0 rgba(0,0,0,0.6); }
-@keyframes popfloat { 0% { opacity: 0; transform: translateY(8px) scale(0.6); } 15% { opacity: 1; transform: translateY(-4px) scale(1.25); } 35% { transform: translateY(-14px) scale(1); } 100% { opacity: 0; transform: translateY(-46px) scale(1); } }
+.pop.crit { color: #ffd24a; font-size: 72px; text-shadow: 0 0 14px rgba(255, 190, 60, 0.9), 0 2px 8px rgba(0, 0, 0, 0.6); }
+@keyframes popfloat { 0% { opacity: 0; margin-top: 14px; scale: 0.5; } 12% { opacity: 1; margin-top: -4px; scale: 1.35; } 30% { margin-top: -16px; scale: 1; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -64px; scale: 1; } }
 
 </style>
 </head>
@@ -5273,12 +5277,12 @@ function renderShop(app, a) {
 
 // ---------- 战斗 ----------
 // 飘字：每次重绘都重建元素，用负的 animation-delay 接着上次的进度播放
-function popLayer(app, side) {
+function popOverlay(app) {
   const now = Date.now();
-  const mine = (app.pops || []).filter((q) => q.on === side && now - q.t0 < POP_LIFE_MS + 400);
+  const mine = (app.pops || []).filter((q) => now - q.t0 < POP_LIFE_MS + 400);
   if (!mine.length) return null;
-  return h('div', { class: 'pop-layer', 'aria-hidden': 'true' }, mine.map((q) =>
-    h('span', { class: `pop ${q.kind}${q.crit ? ' crit' : ''}`, style: `left:${22 + ((q.id * 37) % 56)}%;animation-delay:${q.delay - (now - q.t0)}ms` }, q.crit ? `暴击 ${q.text}` : q.text)));
+  return h('div', { class: 'pop-overlay', 'aria-hidden': 'true' }, mine.map((q) =>
+    h('span', { class: `pop on-${q.on} ${q.kind}${q.crit ? ' crit' : ''}`, style: `left:${28 + ((q.id * 37) % 44)}%;animation-delay:${q.delay - (now - q.t0)}ms` }, q.crit ? `暴击 ${q.text}` : q.text)));
 }
 
 function renderBattle(app, a) {
@@ -5289,18 +5293,18 @@ function renderBattle(app, a) {
   const skillActs = acts.filter((x) => x.type === 'skill');
   const itemActs = acts.filter((x) => x.type === 'item');
   return h('section', { class: 'screen' },
-    h('div', { class: `panel enemy-row has-pops${e.isBoss || e.isFinal ? ' boss' : e.isTrial ? ' trial' : ''}` },
-      popLayer(app, 'enemy'),
+    h('div', { class: `panel enemy-row${e.isBoss || e.isFinal ? ' boss' : e.isTrial ? ' trial' : ''}` },
       h('div', { class: `face${portraitSrc(e) ? ` art${portraitFull(e) ? ' full' : ''}` : ''}${app.flash && app.flash.enemy ? ' hit' : ''}`, 'aria-hidden': 'true' },
         portraitSrc(e) ? h('img', { src: portraitSrc(e), alt: '', draggable: 'false' }) : e.icon),
       h('div', null,
         h('div', { class: 'ename' }, e.name, ' ', h('span', { class: 'tag' }, `${e.element}属性`), e.human ? h('span', { class: 'tag bad' }, '魔修') : null, e.isBoss ? h('span', { class: 'tag bad' }, '瓶颈首领') : null, b.rule ? h('span', { class: 'tag bad', title: RULE_INFO[b.rule].desc }, RULE_INFO[b.rule].name) : null),
         b.rule === 'fear' ? h('div', { class: 'muted' }, '生命：？？？（被恐惧遮蔽了）') : meter('生命', e.hp, e.stats.maxHp, 'hp'),
         statusTags(e).length ? h('div', { class: 'row tight' }, statusTags(e)) : null)),
-    h('div', { class: 'log', role: 'log', 'aria-live': 'polite', 'aria-label': '战斗日志' },
-      b.log.slice(-60).map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, l.text))),
-    h('div', { class: `panel has-pops${app.flash && app.flash.player ? ' hurt' : ''}` },
-      popLayer(app, 'player'),
+    h('div', { class: 'log-wrap' },
+      h('div', { class: 'log', role: 'log', 'aria-live': 'polite', 'aria-label': '战斗日志' },
+        b.log.slice(-60).map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, l.text))),
+      popOverlay(app)),
+    h('div', { class: `panel${app.flash && app.flash.player ? ' hurt' : ''}` },
       h('div', { class: 'row spread' },
         h('strong', null, `${p.icon} ${p.name} `, h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
         h('span', { class: 'row tight' }, goldBadge(p), h('span', { class: 'tag' }, `第 ${b.turn} 回合`))),
