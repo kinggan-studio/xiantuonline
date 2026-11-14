@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="xiantu-build" content="b53eb35431">
+  <meta name="xiantu-build" content="114bb4d96d">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="color-scheme" content="light dark">
   <title>仙途轮回</title>
@@ -112,15 +112,37 @@ body::before {
   flex-direction: column;
   gap: 8px;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  overflow-y: auto; /* 仅在屏幕极矮、放不下时兜底滚动 */
-  overscroll-behavior: contain;
+  overflow: hidden; /* 顶栏、底栏固定；放不下时只有中间的 .screen-body 滚动 */
 }
+.screen-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.screen-body > * { flex-shrink: 0; }
+.screen-body > .log, .screen-body > .log-wrap, .screen-body > .shop { flex-shrink: 1; }
+.bottom-bar { flex: none; display: flex; flex-direction: column; gap: 8px; }
+.screen-title { font-size: 18px; letter-spacing: 0.2em; border-left: 4px solid var(--cinnabar); padding-left: 8px; }
 
 h1, h2, h3, p { margin: 0; }
 
 /* 顶栏：印章标识 + 标题 */
-.topbar { display: flex; align-items: center; justify-content: space-between; flex: none; }
-.brand { display: flex; align-items: center; font-size: 22px; font-weight: 700; letter-spacing: 0.3em; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+.topbar { display: flex; align-items: center; gap: 6px; flex: none; }
+.topbar { justify-content: space-between; }
+.topbar-wrap { flex: none; display: flex; flex-direction: column; gap: 4px; }
+.hud { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.hud .gold-badge { font-size: 16px; padding: 1px 10px 1px 6px; }
+.dao-badge { font: inherit; font-size: 14px; font-weight: 700; color: var(--jade, #5aa58a); background: color-mix(in srgb, var(--jade, #5aa58a) 14%, transparent); border: 1px solid color-mix(in srgb, var(--jade, #5aa58a) 55%, transparent); border-radius: 999px; padding: 2px 11px; cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dao-badge:active { transform: translateY(1px); }
+.row.no-wrap { flex-wrap: nowrap; flex: none; }
+.icon-btn.ghost { visibility: hidden; }
+@media (max-width: 380px) {
+  .brand { font-size: 18px; letter-spacing: 0.04em; }
+  .brand .logo-mark { width: 28px; height: 28px; margin-right: 6px; }
+  .icon-btn { width: 36px; height: 36px; font-size: 16px; }
+}
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+.brand { display: flex; align-items: center; font-size: 21px; font-weight: 700; letter-spacing: 0.12em; white-space: nowrap; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
 .brand::before {
   content: "仙";
   display: inline-grid;
@@ -138,7 +160,8 @@ h1, h2, h3, p { margin: 0; }
   text-shadow: none;
 }
 .icon-btn {
-  width: 42px; height: 42px;
+  flex: none;
+  width: 40px; height: 40px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, var(--paper-2), var(--paper-3));
   color: var(--ink);
@@ -149,7 +172,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .icon-btn:active { transform: translateY(1px); }
 @media (hover: hover) { .icon-btn:hover { border-color: var(--cinnabar); } }
-.icon-btn + .icon-btn { margin-left: 8px; }
+.icon-btn + .icon-btn { margin-left: 0; }
 
 /* 面板：像一幅小卷轴，双层描边 */
 .panel {
@@ -416,6 +439,7 @@ select {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
+.sheet.tall { height: 90vh; height: 90dvh; max-height: 640px; }
 .sheet {
   width: 100%; max-width: 520px;
   max-height: 90vh; max-height: 90dvh;
@@ -434,6 +458,14 @@ select {
 /* 内容区单独滚动，右上角的 ✕ 固定在弹窗上 */
 .sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 16px; -webkit-overflow-scrolling: touch; }
 .sheet-body > h2:first-child { padding-right: 40px; }
+/* 行囊：标题和标签页固定在上，只有下面的装备 / 武学列表滚动 */
+.sheet-body.split { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.sheet-head { flex: none; padding: 14px 16px 6px; border-bottom: 1px solid var(--line-soft, var(--line)); background: linear-gradient(180deg, var(--paper), var(--paper-2)); }
+.sheet-head h2 { padding-right: 40px; margin-bottom: 6px; }
+.sheet-head .tabs { border-bottom: 0; }
+.sheet-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 16px 16px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.item-actions { display: flex; gap: 6px; flex: none; }
+.item-actions .seal { min-width: 54px; }
 .x-close {
   position: absolute; top: 8px; right: 8px; z-index: 3;
   width: 36px; height: 36px; display: grid; place-items: center;
@@ -1105,6 +1137,7 @@ const actions = {
     run.shop = null;
     app.shopMsg = '';
     app.shopTab = 'buy';
+    if (!(run.shopVisit && run.shopVisit.bought > 0)) npcOf(run).merchant.bought = 0; // 空手而归：老主顾资格清零
     const bye = merchantFarewell(run.shopVisit, run.depth);
     run.shopVisit = null;
     appendJournal(run, [{ text: '你告别了行商，继续赶路。', kind: 'info' }, ...(bye ? [{ text: bye.text, kind: bye.rude ? 'damage' : 'gold' }] : [])]);
@@ -1861,11 +1894,12 @@ function npcOf(run) {
   if (!run.npc) run.npc = {};
   run.npc.thief = { stolen: null, caught: 0, ...(run.npc.thief || {}) }; // stolen：上次被偷走的东西；caught：擒住过几次
   run.npc.swindler = { duped: 0, regular: 0, fakes: 0, alias: null, ...(run.npc.swindler || {}) }; // duped：被骗走的元宝；regular：买到过几次真品；fakes：被骗过几次
-  run.npc.merchant = { bought: 0, ...(run.npc.merchant || {}) }; // 在行商那里买过几件东西
+  run.npc.merchant = { bought: 0, ...(run.npc.merchant || {}) }; // 连续几次逛行商都有买，累计买了几件（某次空手而归就清零）
   return run.npc;
 }
 
-// 行商的老主顾折扣：买满 3 件九五折，买满 10 件九折
+// 行商的老主顾折扣：连续光顾累计买满 3 件九五折，买满 10 件九折。
+// 哪次逛他的摊子什么都没买（被骂了），累计清零，下次回到原价、要重新攒
 const merchantLoyalty = (npc) => (npc.merchant.bought >= 10 ? 0.9 : npc.merchant.bought >= 3 ? 0.95 : 1);
 
 function describeLoss(loss) {
@@ -4939,14 +4973,32 @@ function rootLabel(rootId, qualityId) {
   return h('span', { class: `root-name q-${q.id}` }, `${q.name}·${ROOTS[rootId].name}`);
 }
 
-function topbar(a, { bag = false } = {}) {
-  return h('header', { class: 'topbar' },
-    h('h1', { class: logoSrc() ? 'brand has-logo' : 'brand' }, logoSrc() ? h('img', { class: 'logo-mark', src: logoSrc(), alt: '', width: 34, height: 34 }) : null, '仙途轮回'),
-    h('div', { class: 'row tight' },
-      bag ? h('button', { class: 'icon-btn', 'aria-label': '行囊', onclick: a.openBag }, '🎒') : null,
-      h('button', { class: 'icon-btn', 'aria-label': '玩法说明', onclick: a.openHelp }, '?'),
-      h('button', { class: 'icon-btn', 'aria-label': '菜单', onclick: a.openMenu }, '☰')),
-  );
+// 顶栏：整个游戏所有页面位置固定——左边游戏名，中间元宝，右边 行囊 / 说明 / 菜单
+// 没有进行中的修行（选角页）时元宝和行囊隐藏但仍占位；战斗中行囊灰掉，避免打到一半换装
+function topbar(app, a) {
+  const run = app.save.run;
+  const inRun = !!run && app.screen !== 'select';
+  const bagOk = inRun && app.screen !== 'battle';
+  const dao = app.save.meta.dao || 0;
+  return h('header', { class: 'topbar-wrap' },
+    h('div', { class: 'topbar' },
+      h('h1', { class: logoSrc() ? 'brand has-logo' : 'brand' }, logoSrc() ? h('img', { class: 'logo-mark', src: logoSrc(), alt: '', width: 34, height: 34 }) : null, '仙途轮回'),
+      h('div', { class: 'row tight no-wrap' },
+        h('button', { class: `icon-btn${inRun ? '' : ' ghost'}`, 'aria-label': '行囊', disabled: !bagOk, onclick: a.openBag }, '🎒'),
+        h('button', { class: 'icon-btn', 'aria-label': '玩法说明', onclick: a.openHelp }, '?'),
+        h('button', { class: 'icon-btn', 'aria-label': '菜单', onclick: a.openMenu }, '☰'))),
+    // 货币栏：元宝（本世）+ 道果（永久，点一下进道果加持）
+    h('div', { class: 'hud' },
+      inRun ? goldBadge(run.player) : null,
+      h('button', { class: 'dao-badge', 'aria-label': `道果 ${dao}，点击打开道果加持`, onclick: a.openDao }, h('span', { 'aria-hidden': 'true' }, '☯'), ` 道果 ${fmt(dao)}`)));
+}
+
+// 整屏骨架：顶栏固定在上，中间内容自己滚动，底栏（主按钮 + 自动开关）固定在下
+function frame(app, a, cls, body, bottom) {
+  return h('section', { class: `screen ${cls || ''}`.trim() },
+    topbar(app, a),
+    h('div', { class: 'screen-body' }, body),
+    bottom && bottom.flat(Infinity).some(Boolean) ? h('div', { class: 'bottom-bar' }, bottom) : null);
 }
 
 // 装备：名字按品质着色，如「🗡️ [橙]传世剑」；说明为「武器 · 橙品｜攻击 +20 · 嗜血：…」
@@ -5034,9 +5086,14 @@ function bagBody(app, a) {
       p.learned.map((id) => {
         const s = SKILLS[id];
         const on = p.skills.includes(id);
+        const lv = levelOf(p, id);
+        const have = (p.bag.books || {})[id] || 0;
+        const maxed = lv >= SKILL_MAX_LEVEL;
         return h('div', { class: 'item-row' },
-          h('div', { class: 'item-info' }, h('b', null, `${s.name} Lv.${levelOf(p, id)}`, on ? ' ✔' : ''), h('div', { class: 'muted' }, skillLine(p, s))),
-          h('button', { class: `seal small ${on ? 'on' : ''}`, onclick: () => a.toggleSkill(id) }, on ? '卸下' : '装备'));
+          h('div', { class: 'item-info' }, h('b', null, `${s.name} Lv.${lv}`, on ? ' ✔' : ''), h('div', { class: 'muted' }, skillLine(p, s), have ? `｜持有秘籍 ×${have}` : '')),
+          h('div', { class: 'item-actions' },
+            h('button', { class: 'seal small', disabled: maxed || !have, 'aria-label': `升级${s.name}`, title: maxed ? '已满级' : have ? '消耗一本秘籍，升一级' : '没有这门武学的秘籍', onclick: () => a.study(id) }, maxed ? '满级' : '升级'),
+            h('button', { class: `seal small ${on ? 'on' : ''}`, onclick: () => a.toggleSkill(id) }, on ? '卸下' : '装备')));
       }),
     ];
   } else {
@@ -5051,12 +5108,12 @@ function bagBody(app, a) {
     ];
   }
   return [
-    h('h2', null, '行囊'),
-    h('div', { class: 'tabs', role: 'tablist' }, tabs.map(([id, name]) =>
-      h('button', { class: 'tab', role: 'tab', 'aria-selected': String(d.tab === id), onclick: () => a.bagTab(id) }, name))),
-    d.msg ? h('p', { class: 'notice', role: 'status', style: 'margin:8px 0' }, rich(d.msg)) : null,
-    content,
-    h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '关闭')),
+    h('div', { class: 'sheet-head' },
+      h('h2', null, '行囊'),
+      h('div', { class: 'tabs', role: 'tablist' }, tabs.map(([id, name]) =>
+        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(d.tab === id), onclick: () => a.bagTab(id) }, name))),
+      d.msg ? h('p', { class: 'notice', role: 'status', style: 'margin:6px 0 0' }, rich(d.msg)) : null),
+    h('div', { class: 'sheet-scroll' }, content),
   ];
 }
 
@@ -5263,18 +5320,18 @@ function modal(app, a) {
   // 右上角的关闭按钮固定不动，内容再长也不用滚到最下面才能关；洞府和女骗子必须做出选择，不显示
   const forced = d.type === 'cave' || d.type === 'swindler';
   return h('div', { class: 'modal', onclick: (e) => { if (e.target === e.currentTarget) a.closeDialog(); } },
-    h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' },
+    h('div', { class: `sheet${d.type === 'bag' ? ' tall' : ''}`, role: 'dialog', 'aria-modal': 'true' },
       forced ? null : h('button', { class: 'x-close', 'aria-label': '关闭', onclick: a.closeDialog }, '✕'),
-      h('div', { class: 'sheet-body' }, body)));
+      h('div', { class: `sheet-body${d.type === 'bag' ? ' split' : ''}` }, body)));
 }
 
 // ---------- 入道：选宗门 + 刷灵根 ----------
 
 // 自动开关栏：探索页和战斗页都放在整屏的最底部，位置固定
-function autoBar(app, a, { trial = false } = {}) {
+function autoBar(app, a, { trial = false, off = false } = {}) {
   return h('div', { class: 'auto-bar', role: 'group', 'aria-label': '自动开关' },
-    h('button', { class: `seal small grow-btn ${app.auto ? 'on' : ''}`, 'aria-pressed': String(app.auto), onclick: a.toggleAuto }, app.auto ? '自动战斗：开' : '自动战斗：关'),
-    h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, disabled: trial, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关'));
+    h('button', { class: `seal small grow-btn ${app.auto ? 'on' : ''}`, disabled: off, 'aria-pressed': String(app.auto), onclick: a.toggleAuto }, app.auto ? '自动战斗：开' : '自动战斗：关'),
+    h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, disabled: trial || off, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关'));
 }
 
 // 自动吃药：生命低于这个比例时自动吃回春丹，放在丹药旁边
@@ -5302,14 +5359,12 @@ function renderSelect(app, a) {
         : '这个灵根与该宗门武学不同源，换一个更合适')
       : h('p', { class: 'muted' }, '选好宗门后，这里会提示同源武学');
   const meta = app.save.meta;
-  return h('section', { class: 'screen' },
-    topbar(a),
+  return frame(app, a, '', [
     h('div', { class: 'dao-strip' },
       h('span', { class: 'row tight' },
         (meta.cycle || 1) > 1 ? h('button', { class: 'seal small step', 'aria-label': '降低周目', disabled: (app.selection.cycle || 1) <= 1, onclick: () => a.pickCycle(-1) }, '◀') : null,
         h('b', null, `第 ${app.selection.cycle || 1} 周目`),
-        (meta.cycle || 1) > 1 ? h('button', { class: 'seal small step', 'aria-label': '提高周目', disabled: (app.selection.cycle || 1) >= (meta.cycle || 1), onclick: () => a.pickCycle(1) }, '▶') : null,
-        h('span', null, ` 道果 ${meta.dao || 0}`)),
+        (meta.cycle || 1) > 1 ? h('button', { class: 'seal small step', 'aria-label': '提高周目', disabled: (app.selection.cycle || 1) >= (meta.cycle || 1), onclick: () => a.pickCycle(1) }, '▶') : null),
       h('button', { class: 'seal small', onclick: a.openDao }, '道果加持')),
     h('div', { class: 'panel' },
       h('h2', null, '宗门'),
@@ -5333,8 +5388,9 @@ function renderSelect(app, a) {
     app.notice ? h('p', { class: 'notice', role: 'status' }, app.notice) : null,
     h('div', { class: 'grow' }),
     h('p', { class: 'tip warn', role: 'note' }, h('b', null, '⚠️ 无痕/隐私模式下，关闭页面进度会消失！'), ' 建议「添加到主屏幕」游玩，换设备前请在「☰ 菜单」导出存档码。'),
+  ], [
     h('button', { class: 'seal primary block', disabled: !sectId, onclick: a.begin }, sectId ? '入道' : '请先选择宗门'),
-  );
+  ]);
 }
 
 // ---------- 探索 ----------
@@ -5344,15 +5400,13 @@ function renderExplore(app, a) {
   const sect = SECTS[p.sectId];
   const band = bandAt(run.depth);
   const gate = atGate(run); // 站在区域尽头：要击败首领才能继续
-  return h('section', { class: 'screen' },
-    topbar(a, { bag: true }),
+  return frame(app, a, '', [
     h('div', { class: 'panel' },
       h('div', { class: 'row spread' },
         h('div', { class: 'status-title' }, `${sect.icon} ${sect.name} · `, rootLabel(p.rootId, p.rootQuality || 'pu')),
         h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
-      h('div', { class: 'row spread', style: 'margin:2px 0 4px' },
-        h('p', { class: 'muted' }, `${(run.cycle || 1) > 1 ? `第 ${run.cycle} 周目 · ` : ''}${band.name} · 第 ${fmt(run.depth)} 层 · 已斩 ${fmt(run.kills)} 只`),
-        goldBadge(p, true)),
+      h('div', { style: 'margin:2px 0 4px' },
+        h('p', { class: 'muted' }, `${(run.cycle || 1) > 1 ? `第 ${run.cycle} 周目 · ` : ''}${band.name} · 第 ${fmt(run.depth)} 层 · 已斩 ${fmt(run.kills)} 只`)),
       meter('生命', p.hp, p.stats.maxHp, 'hp'),
       meter('灵力', p.mp, p.stats.maxMp, 'mp'),
       h('div', { class: 'muted' }, `攻 ${fmt(p.stats.atk)} · 防 ${fmt(p.stats.def)} · 身法 ${p.stats.spd} · 暴击 ${Math.round(p.stats.crit * 1000) / 10}%`),
@@ -5381,11 +5435,12 @@ function renderExplore(app, a) {
         ? run.journal.map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, rich(l.text)))
         : h('div', { class: 'ln info' }, '还没有历练记录，点「历练」出发。')),
     (p.keys > 0 || (run.demon && run.demon.inside)) ? h('button', { class: 'seal small block', onclick: a.openDemon }, `🗝 魔界 ×${p.keys || 0}`) : null,
+  ], [
     gate
       ? h('button', { class: 'seal primary block', onclick: a.breakthrough }, `突破 ${REALMS[p.realm]} → ${REALMS[p.realm + 1]}（挑战${BOSS.names[p.realm]}）`)
       : h('button', { class: 'seal primary block', onclick: a.explore }, '历练'),
     autoBar(app, a),
-  );
+  ]);
 }
 
 // ---------- 行商 ----------
@@ -5445,15 +5500,15 @@ function renderShop(app, a) {
     Object.entries(p.items).some(([, n]) => n > 0) ? h('h3', null, '丹药') : null,
     Object.entries(p.items).filter(([, n]) => n > 0).map(([id, n]) => sellRow(h('span', null, h('span', { class: `gear-name r-${ITEMS[id].rarity}` }, `💊 ${ITEMS[id].name}`), ` ×${n}`), ITEMS[id].desc, sellPrice(pillPrice(ITEMS[id], p.realm || 0)), () => a.sell('pill', id), `卖出${ITEMS[id].name}`)),
     !gear.length && !books.length && !Object.values(p.items).some((n) => n > 0) ? h('p', { class: 'muted' }, '你身上没有可卖的东西。') : null);
-  return h('section', { class: 'screen' },
-    h('header', { class: 'topbar' },
-      h('h1', { class: 'brand' }, '行商'),
-      goldBadge(p, true)),
+  return frame(app, a, 'shop', [
+    h('h2', { class: 'screen-title' }, '🏮 行商'),
     tabs,
     selling ? sellList : buyList,
     app.shopMsg ? h('p', { class: 'notice', role: 'status' }, rich(app.shopMsg)) : null,
+  ], [
     h('button', { class: 'seal primary block', onclick: a.leaveShop }, '告辞'),
-  );
+    autoBar(app, a, { off: true }),
+  ]);
 }
 
 // ---------- 战斗 ----------
@@ -5473,7 +5528,7 @@ function renderBattle(app, a) {
   const manualLocked = app.auto || b.over;
   const skillActs = acts.filter((x) => x.type === 'skill');
   const itemActs = acts.filter((x) => x.type === 'item');
-  return h('section', { class: 'screen' },
+  return frame(app, a, '', [
     h('div', { class: `panel enemy-row${e.isBoss || e.isFinal ? ' boss' : e.isTrial ? ' trial' : ''}` },
       h('div', { class: `face${portraitSrc(e) ? ` art${portraitFull(e) ? ' full' : ''}` : ''}${app.flash && app.flash.enemy ? ' hit' : ''}`, 'aria-hidden': 'true' },
         portraitSrc(e) ? h('img', { src: portraitSrc(e), alt: '', draggable: 'false' }) : e.icon),
@@ -5488,31 +5543,31 @@ function renderBattle(app, a) {
     h('div', { class: `panel${app.flash && app.flash.player ? ' hurt' : ''}` },
       h('div', { class: 'row spread' },
         h('strong', null, `${p.icon} ${p.name} `, h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
-        h('span', { class: 'row tight' }, goldBadge(p), h('span', { class: 'tag' }, `第 ${b.turn} 回合`))),
+        h('span', { class: 'tag' }, `第 ${b.turn} 回合`)),
       meter('生命', p.hp, p.stats.maxHp, 'hp'),
       meter('灵力', p.mp, p.stats.maxMp, 'mp'),
       statusTags(p).length ? h('div', { class: 'row tight' }, statusTags(p)) : null),
     b.over
       ? h('div', { class: 'panel stack' },
         h('h2', null, b.winner === 'player' ? '胜利' : b.enemy.isTrial ? '挑战失败' : '身死道消'),
-        a.resultText() ? h('p', { class: 'muted' }, rich(a.resultText())) : null,
-        h('button', { class: 'seal primary block', onclick: a.finish }, b.winner === 'player' ? (b.enemy.isTrial ? (b.enemy.isFinal ? '查看结局' : '返回魔界') : '继续历练') : b.enemy.isTrial ? '离开魔界' : '重入轮回'))
-      : [
-        h('div', { class: 'actions' },
-          h('button', { class: 'seal', disabled: manualLocked, onclick: () => a.act({ type: 'attack' }) }, '普攻'),
-          skillActs.map((s) => h('button', {
-            class: 'seal', disabled: manualLocked || !s.affordable, title: SKILLS[s.skillId].desc,
-            onclick: () => a.act({ type: 'skill', skillId: s.skillId }),
-          }, SKILLS[s.skillId].name, h('span', { class: 'cost' }, `${s.cost} 灵力${levelOf(p, s.skillId) > 1 ? ` · Lv.${levelOf(p, s.skillId)}` : ''}`))),
-          pillGroups(p).map((g) => h('button', {
-            class: `seal pill r-${ITEMS[g.top].rarity}`, disabled: manualLocked, title: g.owned.length === 1 ? ITEMS[g.owned[0].id].desc : '点开选择品质',
-            onclick: () => (g.owned.length === 1 ? a.act({ type: 'item', itemId: g.owned[0].id }) : a.openPills(g.kind, 'battle')),
-          }, pillLabel(g), h('span', { class: 'cost' }, `×${g.total}${g.owned.length > 1 ? ' ▾' : ''}`))),
-          pillAuto(app, a),
-        ),
-      ],
+        a.resultText() ? h('p', { class: 'muted' }, rich(a.resultText())) : null)
+      : null,
+  ], [
+    b.over
+      ? h('button', { class: 'seal primary block', onclick: a.finish }, b.winner === 'player' ? (b.enemy.isTrial ? (b.enemy.isFinal ? '查看结局' : '返回魔界') : '继续历练') : b.enemy.isTrial ? '离开魔界' : '重入轮回')
+      : h('div', { class: 'actions' },
+        h('button', { class: 'seal', disabled: manualLocked, onclick: () => a.act({ type: 'attack' }) }, '普攻'),
+        skillActs.map((s) => h('button', {
+          class: 'seal', disabled: manualLocked || !s.affordable, title: SKILLS[s.skillId].desc,
+          onclick: () => a.act({ type: 'skill', skillId: s.skillId }),
+        }, SKILLS[s.skillId].name, h('span', { class: 'cost' }, `${s.cost} 灵力${levelOf(p, s.skillId) > 1 ? ` · Lv.${levelOf(p, s.skillId)}` : ''}`))),
+        pillGroups(p).map((g) => h('button', {
+          class: `seal pill r-${ITEMS[g.top].rarity}`, disabled: manualLocked, title: g.owned.length === 1 ? ITEMS[g.owned[0].id].desc : '点开选择品质',
+          onclick: () => (g.owned.length === 1 ? a.act({ type: 'item', itemId: g.owned[0].id }) : a.openPills(g.kind, 'battle')),
+        }, pillLabel(g), h('span', { class: 'cost' }, `×${g.total}${g.owned.length > 1 ? ' ▾' : ''}`))),
+        pillAuto(app, a)),
     autoBar(app, a, { trial: b.enemy.isTrial }),
-  );
+  ]);
 }
 
 // ---------- 魔界 ----------
@@ -5521,10 +5576,8 @@ function renderDemon(app, a) {
   const p = run.player;
   const shards = run.demon.shards.length;
   const summon = canSummon(run);
-  return h('section', { class: 'screen demon' },
-    h('header', { class: 'topbar' },
-      h('h1', { class: 'brand' }, '魔界'),
-      h('div', { class: 'muted' }, `心魔碎片 ${shards}/${SHARDS_NEEDED}`)),
+  return frame(app, a, 'demon', [
+    h('div', { class: 'row spread' }, h('h2', { class: 'screen-title' }, '👿 魔界'), h('div', { class: 'muted' }, `心魔碎片 ${shards}/${SHARDS_NEEDED}`)),
     h('p', { class: 'muted' }, '七情心魔劫：每个试炼有一个独特的规则。失败不会死，只是没有奖励，并被送出魔界。'),
     meter('生命', p.hp, p.stats.maxHp, 'hp'),
     h('div', { class: 'shop grow' },
@@ -5541,8 +5594,10 @@ function renderDemon(app, a) {
           h('b', null, `${FINAL.icon} ${FINAL.name}`, run.demon.won ? ' ✔' : ''),
           h('div', { class: 'muted' }, summon ? '七块碎片已集齐，道心已成，可以召唤终局首领。' : run.demon.won ? '你已击败过天道代行者。' : `需要集齐 ${SHARDS_NEEDED} 块碎片（现有 ${shards}）。`)),
         h('button', { class: 'seal small', disabled: !summon, onclick: a.summonFinal }, run.demon.won ? '已通关' : '召唤'))),
+  ], [
     h('button', { class: 'seal primary block', onclick: a.leaveDemon }, '离开魔界'),
-  );
+    autoBar(app, a, { off: true }),
+  ]);
 }
 
 // 屏幕上方的短暂提示。每次重绘都会重建元素，所以用负的 animation-delay 接着上次的进度播放，不会重头闪
@@ -5604,7 +5659,7 @@ const HELP = [
     title: '奇遇、成就与图鉴',
     lines: [
       '神偷一族（合起来约每 70 层遇到一次）有三种人：男神偷会从你的行囊里偷走随机的东西——装备、秘籍、丹药或一小笔元宝，穿在身上的装备和已学会的武学不会被偷，你有 25% 的几率当场擒住他，反而搜出赃款；小飞贼只摸一点元宝，更容易抓住；女骗子会拦住你兜售「祖传宝物」，买不买由你，40% 是蓝品以上的真品，60% 是赝品。商修能识破她们所有人，鬼修有一半几率躲开偷窃，还能一眼看出骗子的货是真是假。',
-      '回头客：这些人物都有记忆。偷过你的男神偷再遇到时，你有机会认出他、追回失物（剑修身手最好）；被你擒住过的男神偷可能来赔礼；被女骗子骗过，她换身打扮再来时你可以当场揭穿，讨回的钱比被骗的还多（鬼修必成，其他人一半一半，失败要赔钱）；从她手里买到过真品，下次她当你是老主顾，价低、真品率高。在行商处买满 3 件九五折，买满 10 件九折。',
+      '回头客：这些人物都有记忆。偷过你的男神偷再遇到时，你有机会认出他、追回失物（剑修身手最好）；被你擒住过的男神偷可能来赔礼；被女骗子骗过，她换身打扮再来时你可以当场揭穿，讨回的钱比被骗的还多（鬼修必成，其他人一半一半，失败要赔钱）；从她手里买到过真品，下次她当你是老主顾，价低、真品率高。在行商处连续光顾、累计买满 3 件九五折，买满 10 件九折；哪次空手而归被骂了，累计清零，要重新攒。',
       '洞府奇遇：发现一处洞府，三间石室只能进一间——丹房（稳妥，丹药和元宝）、藏经阁（秘籍，运气好两本）、兵器室（大概率蓝品以上装备，但有 35% 触发机关受伤）。丹修丹药翻倍，符修必得两本秘籍，剑修破解机关。菜单里可以设置自动历练遇到洞府时是暂停让你选，还是自动选稳妥。',
       '稀有装备（紫、黄、橙）掉落时，屏幕上方会弹出提示，黄和橙还会闪光。装备不会自动穿上，得到后放进行囊，由你自己决定穿不穿、换不换。',
       '成就：走到第几层、击败多少敌人、第一次得到某品质的装备等，达成立刻获得道果。前期的成就很密，头几分钟就能拿到。图鉴：记录你击败过的每种敌人。两者都在菜单里。',
