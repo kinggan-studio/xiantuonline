@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="xiantu-build" content="114bb4d96d">
+  <meta name="xiantu-build" content="cd2eeb57e9">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="color-scheme" content="light dark">
   <title>仙途轮回</title>
@@ -584,13 +584,14 @@ body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent
 
 /* ---------- 提示条（稀有掉落、成就、被偷）与稀有闪光 ---------- */
 .toast-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
-.toasts { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* 提示放在屏幕上三分之一处：避开固定的顶栏、够显眼，又不压住怪物头像和下面的战斗按钮 */
+.toasts { position: absolute; top: max(128px, 26vh); top: max(128px, 26dvh); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .toast { max-width: min(92vw, 420px); padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 15px; background: var(--paper); color: var(--ink); border: 2px solid var(--gold); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); animation: toastlife 3.6s ease both; }
 .toast.achv { border-color: var(--gold); color: var(--gold); }
 .toast.bad { border-color: var(--cinnabar); color: var(--cinnabar); }
 .toast.drop { border-color: var(--c, var(--gold)); box-shadow: 0 0 14px color-mix(in srgb, var(--c, var(--gold)) 55%, transparent), 0 6px 18px rgba(0, 0, 0, 0.35); }
 .toast.r-epic { --c: var(--r-epic); } .toast.r-legendary { --c: var(--r-legendary); } .toast.r-mythic { --c: var(--r-mythic); }
-@keyframes toastlife { 0% { opacity: 0; transform: translateY(-16px) scale(0.94); } 7% { opacity: 1; transform: none; } 82% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-8px); } }
+@keyframes toastlife { 0% { opacity: 0; transform: translateY(12px) scale(0.94); } 7% { opacity: 1; transform: none; } 82% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
 .rare-flash { position: absolute; inset: 0; animation: rareflash 1.2s ease-out both; background: radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--c, var(--gold)) 55%, transparent), transparent 62%); }
 .rare-flash.r-legendary { --c: var(--r-legendary); } .rare-flash.r-mythic { --c: var(--r-mythic); }
 @keyframes rareflash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
@@ -649,7 +650,7 @@ const { bgSrc } = __req("ui/portrait.js");
 const { settleRun, startNextCycle, buyUpgrade, buyRoot, daoGain } = __req("engine/dao.js");
 const { FAVICON } = __req("data/art.js");
 const { resolveCave, pickThiefKind, createSwindle, resolveSwindle, thiefEncounter, npcOf, merchantLoyalty } = __req("engine/events.js");
-const { BATTLE_TICK_MS, EXPLORE_TICK_MS } = __req("data/pace.js");
+const { battleTickMs, EXPLORE_TICK_MS } = __req("data/pace.js");
 const { popsFromLog } = __req("ui/pops.js");
 const { BUILD_ID, fetchServerBuild, applyUpdate } = __req("update.js");
 const { entryLine, killLine, pickLine, BAND_REST, BAND_TREASURE, SWINDLER_TEXT, fill, merchantFarewell } = __req("data/flavor.js");
@@ -792,7 +793,7 @@ function scheduleAuto() {
   autoTimer = setTimeout(() => {
     if (!app.auto || !app.battle || app.battle.over) return;
     actions.act(chooseAutoAction(app.battle, app.autoConfig));
-  }, delay(BATTLE_TICK_MS));
+  }, delay(battleTickMs(app.battle ? app.battle.turn : 0)));
 }
 
 // 背包/商店等对玩家数据的改动后统一存档并重绘
@@ -3053,7 +3054,7 @@ const ENEMY_ATK = 0.45; // 敌人攻击的全局系数：要连续打几千场�
 const ENEMY_EXTRA = 0.30; // 敌人强度额外的线性加成（1 + ENEMY_EXTRA × 境界浮点数），由模拟器调平衡
 // 后期加陡：从 LATE_FROM 境界起，每多一个境界，敌人再额外 ×LATE_GROWTH。装备堆起来之后玩家成长会超过普通曲线，靠这一项把后期拉回来
 // 做成对象是为了让模拟器能临时改值来标定；游戏里不会修改
-const CURVE = { lateFrom: 4, lateGrowth: 1.2, cycleStep: 0.12 };
+const CURVE = { lateFrom: 3, lateGrowth: 1.2, cycleStep: 0.12 };
 // 周目：每多一个周目，所有敌人的生命、攻击、防御同时 +cycleStep（第 n 周目 = 1 + cycleStep × (n-1)）。生命和攻击一起涨，实际难度约为它的平方，所以步长要小
 
 // 瓶颈首领：每个大境界突破前必须击败。数值是同境界末期普通敌人的数倍
@@ -3344,12 +3345,23 @@ const REGIONS = Object.fromEntries(BANDS.map((b) => [b.id, { id: b.id, name: b.n
 return { EVENTS, REGIONS };
 },
 "data/pace.js": function () {
-// 节奏：固定的速度，玩家不能调。比最初的 1× 快（回合 450ms → 240ms），又不至于瞬间结束
-// 一场战斗约 6~7 回合，大约 1.5 秒；一层（含前进和战后）约 2.5 秒
-const BATTLE_TICK_MS = 240; // 自动战斗：每回合间隔
-const EXPLORE_TICK_MS = 300; // 自动历练：前进、战后结算的间隔
+// 节奏：固定的速度，玩家不能调。比最初的 1× 快得多，又不至于瞬间结束
+// 普通战斗约 6~7 回合，大约 1.3 秒；一层（含前进和战后）约 2.2 秒
+// 打得久（后期怪物血厚）时回合间隔会越来越短，一场硬仗也不会拖太久
+const BATTLE_TICK_MS = 200; // 自动战斗：前几回合的间隔
+const BATTLE_FAST_MS = 60; // 自动战斗：拖得很长时的最短间隔
+const BATTLE_RAMP_FROM = 6; // 从第几回合起开始加速
+const BATTLE_RAMP_TO = 22; // 到第几回合时加到最快
+const EXPLORE_TICK_MS = 250; // 自动历练：前进、战后结算的间隔
 
-return { BATTLE_TICK_MS, EXPLORE_TICK_MS };
+// turn：已经打了几回合
+function battleTickMs(turn = 0) {
+  if (turn <= BATTLE_RAMP_FROM) return BATTLE_TICK_MS;
+  const t = Math.min(1, (turn - BATTLE_RAMP_FROM) / (BATTLE_RAMP_TO - BATTLE_RAMP_FROM));
+  return Math.round(BATTLE_TICK_MS + (BATTLE_FAST_MS - BATTLE_TICK_MS) * t);
+}
+
+return { BATTLE_TICK_MS, BATTLE_FAST_MS, BATTLE_RAMP_FROM, BATTLE_RAMP_TO, EXPLORE_TICK_MS, battleTickMs };
 },
 "ui/pops.js": function () {
 // 战斗飘字：从新增的战斗日志里取出伤害和治疗数值，在对应的头像/面板上飘起来
