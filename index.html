@@ -499,6 +499,12 @@ body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent
   .dao-strip { font-size: 12.5px; }
 }
 
+/* 一键出售：按品质勾选 */
+.bulk-sell { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 4px; margin: 4px 0; }
+.chip { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; background: transparent; cursor: pointer; opacity: 0.55; }
+.chip.on { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); font-weight: 700; box-shadow: 0 0 0 1px currentColor; }
+.chip:disabled { opacity: 0.25; cursor: default; }
+
 </style>
 </head>
 <body>
@@ -516,7 +522,8 @@ const { FAVICON } = __req("data/art.js");
 const { createNewRun, createEnemy, resetForBattle, recoverAfterBattle, walkRegen, restAtCamp, rollRoot, appendJournal, recomputePlayer } = __req("engine/state.js");
 const { pickEvent } = __req("engine/scheduler.js");
 const { loadGame, saveGame, clearRun, exportCode, importCode } = __req("engine/save.js");
-const { equipItem, unequipItem, toggleLoadout } = __req("engine/inventory.js");
+const { equipItem, unequipItem, toggleLoadout, studyBook, sellEquipment, sellJunk, sellBook, sellLearnedSkill, sellPill } = __req("engine/inventory.js");
+const { pillPrice } = __req("engine/loot.js");
 const { rollRewards, rollChest, applyRewards } = __req("engine/rewards.js");
 const { generateShop, buyFromShop } = __req("engine/shop.js");
 const { atGate, syncRealm, advancePastGate, createBoss } = __req("engine/progress.js");
@@ -529,6 +536,7 @@ const { chooseAutoAction } = __req("combat/autoplay.js");
 const { useItem } = __req("combat/skills.js");
 const { EVENTS } = __req("data/regions.js");
 const { ITEMS } = __req("data/items.js");
+const { SKILLS } = __req("data/skills.js");
 const { growth } = __req("data/equipment.js");
 const { realmName } = __req("data/realms.js");
 const { mount } = __req("ui/dom.js");
@@ -572,6 +580,8 @@ const app = {
   recovered: null,
   rewardText: '',
   shopMsg: '',
+  shopTab: 'buy', // 行商界面：buy 购买 / sell 出售
+  sellPick: ['common', 'uncommon'], // 一键出售勾选的品质
   notice: loaded.error
     ? `存档读取失败：${loaded.error}。原存档没有被覆盖，你可以先导出它再开始新修行。`
     : storage.volatile ? '当前浏览器禁止本地存储，进度不会保留，请先导出存档码。' : '',
@@ -826,10 +836,51 @@ const actions = {
     if (r.ok) appendJournal(run, [{ text: `🛒 ${r.msg}`, kind: 'gold' }]);
     commit();
   },
+  setShopTab(tab) { app.shopTab = tab; app.shopMsg = ''; render(); },
+  // 出售：装备、秘籍、已学会的武学、丹药，价格都低于买价
+  sell(kind, id) {
+    const run = app.save.run;
+    const p = run.player;
+    let r;
+    if (kind === 'equip') r = sellEquipment(p, id);
+    else if (kind === 'book') r = sellBook(p, id);
+    else if (kind === 'skill') {
+      if (!window.confirm(`确定遗忘并卖掉已学会的武学「${SKILLS[id].name}」吗？它的等级也会一起清零。`)) return;
+      r = sellLearnedSkill(p, id);
+    } else r = sellPill(p, id, pillPrice(ITEMS[id], p.realm || 0));
+    app.shopMsg = r.msg;
+    if (r.ok) appendJournal(run, [{ text: `💰 ${r.msg}`, kind: 'gold' }]);
+    commit();
+  },
+  // 一键出售：勾选要卖的品质（白/绿/蓝/紫/黄/橙），再点出售。包含紫品及以上时会先确认
+  toggleSellPick(rarity) {
+    const i = app.sellPick.indexOf(rarity);
+    if (i >= 0) app.sellPick.splice(i, 1); else app.sellPick.push(rarity);
+    render();
+  },
+  sellJunk() {
+    const run = app.save.run;
+    const picked = [...app.sellPick];
+    if (!picked.length) return;
+    if (picked.some((r) => ['epic', 'legendary', 'mythic'].includes(r))
+      && !window.confirm('勾选里包含紫、黄或橙品装备，确定一起卖掉吗？卖掉后无法找回。')) return;
+    const r = sellJunk(run.player, picked);
+    app.shopMsg = r.msg;
+    if (r.ok) appendJournal(run, [{ text: `💰 ${r.msg}`, kind: 'gold' }]);
+    commit();
+  },
+  // 行囊里研读秘籍：学会新武学或升级，由玩家决定
+  study(id) {
+    const r = studyBook(app.save.run.player, id);
+    app.dialog.msg = r.msg;
+    if (r.ok) appendJournal(app.save.run, [{ text: `📖 ${r.msg}`, kind: 'info' }]);
+    commit();
+  },
   leaveShop() {
     const run = app.save.run;
     run.shop = null;
     app.shopMsg = '';
+    app.shopTab = 'buy';
     appendJournal(run, [{ text: '你告别了行商，继续赶路。', kind: 'info' }]);
     app.screen = 'explore';
     commit();
@@ -1377,7 +1428,7 @@ function createPlayer({ sectId, rootId, quality = 'pu', name = '你', cycle = 1,
     learned: [...sect.starterSkills], // 已学会的全部武学
     skillLevels: Object.fromEntries(sect.starterSkills.map((id) => [id, 1])), // 武学等级，重复获得会升级
     equipment: Object.fromEntries(SLOTS.map((s) => [s, null])), // 已穿戴的装备实例（8 个部位）
-    bag: { equipment: [] }, // 未穿戴的装备实例
+    bag: { equipment: [], books: {} }, // 未穿戴的装备实例；武学秘籍 { 武学id: 数量 }
     souls: 0,
     keys: 0, // 心魔钥匙：进入魔界要消耗
     statuses: [],
@@ -1667,7 +1718,8 @@ return { REALMS, STAGES, realmStats, realmName };
 const SLOTS = ['weapon', 'armor', 'bracer', 'boots', 'talisman', 'jade', 'ring', 'necklace'];
 const SLOT_NAMES = { weapon: '武器', armor: '衣服', bracer: '护腕', boots: '鞋子', talisman: '护符', jade: '玉佩', ring: '戒指', necklace: '项链' };
 const BAG_MAX = 30; // 行囊上限，装不下的新装备自动折算成金币
-const SELL_RATE = 0.35; // 折算金币 = 装备价格 × 35%
+const SELL_RATE = 0.35; // 行囊满了自动折算金币 = 装备价格 × 35%
+const SHOP_SELL_RATE = 0.4; // 在行商处主动出售：价格 × 40%（比买价低很多，但比自动折算多一点）
 
 // 品质（从低到高）：白、绿、蓝、紫、黄、橙。mul 属性倍率；affixes 特殊词条数量；layers 定价用的「相当于几层历练的金币收入」
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
@@ -1786,7 +1838,7 @@ function itemTitle(item) {
   return `[${RARITY_INFO[item.rarity].name}]${item.name}`;
 }
 
-return { SLOTS, SLOT_NAMES, BAG_MAX, SELL_RATE, RARITIES, RARITY_INFO, RARITY_WEIGHTS, growth, INCOME_PER_LAYER, SLOT_PRICE_FACTOR, GEAR_SCALE, CRIT_CAP, TEMPLATES, AFFIX_SCALE, AFFIXES, STAT_LABELS, describeItem, itemTitle };
+return { SLOTS, SLOT_NAMES, BAG_MAX, SELL_RATE, SHOP_SELL_RATE, RARITIES, RARITY_INFO, RARITY_WEIGHTS, growth, INCOME_PER_LAYER, SLOT_PRICE_FACTOR, GEAR_SCALE, CRIT_CAP, TEMPLATES, AFFIX_SCALE, AFFIXES, STAT_LABELS, describeItem, itemTitle };
 },
 "data/world.js": function () {
 // 世界：深度分 9 个区域，敌人属性随深度连续增长（每个大境界 ×1.7，与玩家成长曲线一致）
@@ -1879,7 +1931,7 @@ const { SLOTS } = __req("data/equipment.js");
 const { bandIndexAt } = __req("engine/world.js");
 const { realmStageAt } = __req("engine/progress.js");
 
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 const SAVE_KEY = 'xiantu:save';
 
 // MIGRATIONS[n] 把 n 版存档转换为 n+1 版。游戏更新存档结构时在这里追加
@@ -1980,6 +2032,16 @@ const MIGRATIONS = {
         if (!out.run.player.cycle) out.run.player.cycle = 1;
         if (!out.run.player.dao) out.run.player.dao = {};
       }
+    }
+    return out;
+  },
+  // v8 → v9：武学获得后变成行囊里的「秘籍」，由玩家决定学会/升级还是出售
+  8: (save) => {
+    const out = { ...save };
+    if (out.run && out.run.player) {
+      const p = out.run.player;
+      if (!p.bag) p.bag = { equipment: [] };
+      if (!p.bag.books) p.bag.books = {};
     }
     return out;
   },
@@ -2223,7 +2285,7 @@ return { MAX_REALM, realmStageAt, atGate, syncRealm, advancePastGate, createBoss
 "engine/inventory.js": function () {
 // 行囊：装备的穿脱、武学栏的装卸、学会/升级武学。都直接修改 player 并返回结果
 const { SKILLS, SKILL_MAX_LEVEL, SKILL_MAXED_REFUND } = __req("data/skills.js");
-const { BAG_MAX, growth } = __req("data/equipment.js");
+const { BAG_MAX, growth, SHOP_SELL_RATE } = __req("data/equipment.js");
 const { LOADOUT_MAX, recomputePlayer } = __req("engine/state.js");
 const { sellValue } = __req("engine/loot.js");
 
@@ -2303,7 +2365,87 @@ function describeLearn(res, skillId) {
   return `武学「${name}」已臻圆满，折算 ${res.gold} 金币`;
 }
 
-return { skillLevel, bagFull, addToBag, equipItem, unequipItem, toggleLoadout, learnSkill, describeLearn };
+// ---- 武学秘籍：获得的武学先放进行囊，由玩家决定学会/升级还是卖掉 ----
+const bookCount = (p, id) => (p.bag.books && p.bag.books[id]) || 0;
+const totalBooks = (p) => Object.values(p.bag.books || {}).reduce((s, n) => s + n, 0);
+
+function addBook(p, skillId, n = 1) {
+  if (!SKILLS[skillId]) throw new Error(`未知武学: ${skillId}`);
+  if (!p.bag.books) p.bag.books = {};
+  p.bag.books[skillId] = (p.bag.books[skillId] || 0) + n;
+}
+
+function takeBook(p, skillId) {
+  p.bag.books[skillId] -= 1;
+  if (p.bag.books[skillId] <= 0) delete p.bag.books[skillId];
+}
+
+// 研读秘籍：新武学则学会（武学栏有空位自动装上），已学会则升一级。满级的不能再研读（只能卖掉）
+function studyBook(p, skillId) {
+  if (bookCount(p, skillId) <= 0) return { ok: false, msg: '行囊里没有这本秘籍' };
+  if (skillLevel(p, skillId) >= SKILL_MAX_LEVEL) return { ok: false, msg: '这门武学已经满级了，秘籍只能卖掉' };
+  const r = learnSkill(p, skillId);
+  takeBook(p, skillId);
+  return { ok: true, msg: describeLearn(r, skillId), result: r };
+}
+
+// ---- 在行商处出售：价格都低于买价 ----
+const sellPrice = (base) => Math.max(1, Math.round(base * SHOP_SELL_RATE));
+const equipSellPrice = (item) => sellPrice(item.price);
+const bookSellPrice = (p, skillId) => sellPrice(SKILLS[skillId].price * growth(p.realm || 0));
+// 已学会的武学：按等级折算（每一级相当于一本秘籍）
+const skillSellPrice = (p, skillId) => bookSellPrice(p, skillId) * skillLevel(p, skillId);
+
+function sellEquipment(p, uid) {
+  const i = p.bag.equipment.findIndex((it) => it.uid === uid);
+  if (i < 0) return { ok: false, msg: '行囊里没有这件装备（穿在身上的先卸下）' };
+  const item = p.bag.equipment.splice(i, 1)[0];
+  const gold = equipSellPrice(item);
+  p.gold += gold;
+  return { ok: true, gold, msg: `卖出「${item.name}」，得 ${gold} 金币`, item };
+}
+
+// 一键出售不高于 maxRarity 品质的行囊装备
+function sellJunk(p, rarities) {
+  const keep = [];
+  let n = 0, gold = 0;
+  for (const it of p.bag.equipment) {
+    if (rarities.includes(it.rarity)) { n += 1; gold += equipSellPrice(it); } else keep.push(it);
+  }
+  p.bag.equipment = keep;
+  p.gold += gold;
+  return { ok: n > 0, n, gold, msg: n ? `一共卖出 ${n} 件装备，得 ${gold} 金币` : '没有可卖的装备' };
+}
+
+function sellBook(p, skillId) {
+  if (bookCount(p, skillId) <= 0) return { ok: false, msg: '行囊里没有这本秘籍' };
+  const gold = bookSellPrice(p, skillId);
+  takeBook(p, skillId);
+  p.gold += gold;
+  return { ok: true, gold, msg: `卖出《${SKILLS[skillId].name}》秘籍，得 ${gold} 金币` };
+}
+
+// 卖掉已学会的武学（相当于遗忘）。至少要留一门，否则没法战斗
+function sellLearnedSkill(p, skillId) {
+  if (!p.learned.includes(skillId)) return { ok: false, msg: '你没有学会这门武学' };
+  if (p.learned.length <= 1) return { ok: false, msg: '至少要留一门武学' };
+  const gold = skillSellPrice(p, skillId);
+  p.learned = p.learned.filter((x) => x !== skillId);
+  p.skills = p.skills.filter((x) => x !== skillId);
+  delete p.skillLevels[skillId];
+  p.gold += gold;
+  return { ok: true, gold, msg: `遗忘并卖出「${SKILLS[skillId].name}」，得 ${gold} 金币` };
+}
+
+function sellPill(p, itemId, itemPrice) {
+  if (!((p.items[itemId] || 0) > 0)) return { ok: false, msg: '没有这种丹药了' };
+  const gold = sellPrice(itemPrice);
+  p.items[itemId] -= 1;
+  p.gold += gold;
+  return { ok: true, gold, msg: `卖出一颗丹药，得 ${gold} 金币` };
+}
+
+return { skillLevel, bagFull, addToBag, equipItem, unequipItem, toggleLoadout, learnSkill, describeLearn, bookCount, totalBooks, addBook, studyBook, sellPrice, equipSellPrice, bookSellPrice, skillSellPrice, sellEquipment, sellJunk, sellBook, sellLearnedSkill, sellPill };
 },
 "data/skills.js": function () {
 // 武学数据（所有宗门通用）。element:'self' 表示跟随使用者的灵根属性
@@ -2603,7 +2745,7 @@ const { SKILLS } = __req("data/skills.js");
 const { ITEMS } = __req("data/items.js");
 const { growth, itemTitle } = __req("data/equipment.js");
 const { generateEquipment } = __req("engine/loot.js");
-const { addToBag, learnSkill, describeLearn } = __req("engine/inventory.js");
+const { addToBag, addBook } = __req("engine/inventory.js");
 const { CHEST_GOLD_CHANCE, CHEST_GOLD_RANGE } = __req("engine/economy.js");
 const { KEY_DROP_CHANCE } = __req("data/demon.js");
 
@@ -2649,7 +2791,8 @@ function applyRewards(player, rewards) {
       player.keys = (player.keys || 0) + 1;
       texts.push('「心魔钥匙」');
     } else if (d.kind === 'skill') {
-      texts.push(describeLearn(learnSkill(player, d.id), d.id));
+      addBook(player, d.id);
+      texts.push(`武学秘籍《${SKILLS[d.id].name}》（已放入行囊）`);
     } else {
       const n = d.count || 1;
       player.items[d.id] = (player.items[d.id] || 0) + n;
@@ -2763,13 +2906,13 @@ const ENDING = [
 return { KEY_DROP_CHANCE, DEFEAT_HP_RATIO, TRIAL_POWER, FINAL_POWER, TRIAL_BASE, FINAL_BASE, TRIALS, FINAL, SHARDS_NEEDED, ENDING };
 },
 "engine/shop.js": function () {
-// 行商：每次遇到都随机生成 3 件装备（品质看境界、数值随机）、2 门武学（可能是已学会的，重复则升级）和限量药品。
+// 行商：每次遇到都随机生成 3 件装备（品质看境界、数值随机）、2 本武学秘籍（买回去自己决定学会/升级还是卖掉）和限量药品。也收购行囊里的装备、秘籍、已学武学和丹药。
 // 库存存进 run.shop，刷新页面不会重新刷货
 const { SKILLS, SKILL_MAX_LEVEL } = __req("data/skills.js");
 const { ITEMS } = __req("data/items.js");
 const { BAG_MAX, itemTitle } = __req("data/equipment.js");
 const { generateEquipment, skillPrice, pillPrice } = __req("engine/loot.js");
-const { bagFull, learnSkill, describeLearn, skillLevel } = __req("engine/inventory.js");
+const { bagFull, addBook, skillLevel } = __req("engine/inventory.js");
 
 const PILL_STOCK = 3;
 
@@ -2817,8 +2960,9 @@ function buyFromShop(player, shop, index) {
     entry.sold = true;
     what = `购买了${itemTitle(entry.item)}，已放入行囊`;
   } else if (entry.kind === 'skill') {
-    what = describeLearn(learnSkill(player, entry.id), entry.id);
+    addBook(player, entry.id);
     entry.sold = true;
+    what = `购买了武学秘籍《${SKILLS[entry.id].name}》，已放入行囊（在行囊里选择学习或出售）`;
   } else {
     player.items[entry.id] = (player.items[entry.id] || 0) + 1;
     entry.stock -= 1;
@@ -3616,6 +3760,8 @@ const { RULE_INFO } = __req("combat/rules.js");
 const { portraitSrc, logoSrc } = __req("ui/portrait.js");
 const { DAO_UPGRADES, ROOT_UNLOCK_COST, upgradeCost } = __req("data/dao.js");
 const { upgradeLevel, daoGain } = __req("engine/dao.js");
+const { equipSellPrice, bookSellPrice, skillSellPrice, sellPrice } = __req("engine/inventory.js");
+const { pillPrice } = __req("engine/loot.js");
 const { canSummon, trialCleared } = __req("engine/demon.js");
 const { splitRarity } = __req("ui/richtext.js");
 
@@ -3707,8 +3853,20 @@ function bagBody(app, a) {
     ];
   } else if (d.tab === 'skill') {
     content = [
+      h('h3', null, `武学秘籍（${Object.values(p.bag.books || {}).reduce((x, n) => x + n, 0)} 本）`),
+      Object.keys(p.bag.books || {}).length
+        ? Object.entries(p.bag.books).map(([id, n]) => {
+          const s = SKILLS[id];
+          const lv = p.learned.includes(id) ? levelOf(p, id) : 0;
+          const maxed = lv >= SKILL_MAX_LEVEL;
+          const tip = lv === 0 ? '未学会 → 研读后学会' : maxed ? `已满级 Lv.${lv}，只能到行商处卖掉` : `已学 Lv.${lv} → 研读后升至 Lv.${lv + 1}`;
+          return h('div', { class: 'item-row' },
+            h('div', { class: 'item-info' }, h('b', null, `📜 《${s.name}》秘籍 ×${n}`), h('div', { class: 'muted' }, `${tip}｜${skillLine(p, s)}｜行商收购约 ${bookSellPrice(p, id)} 金`)),
+            h('button', { class: 'seal small', disabled: maxed, onclick: () => a.study(id) }, lv === 0 ? '学会' : '升级'));
+        })
+        : h('p', { class: 'muted' }, '没有秘籍。击败妖兽、打开宝箱或向行商购买可以得到；得到后自己决定学会、升级还是卖掉，不会自动学习。'),
       h('h3', null, `武学栏 ${p.skills.length}/${LOADOUT_MAX}`),
-      h('p', { class: 'muted' }, `战斗中只能使用已装备的武学。重复获得同一武学会升级（最高 Lv.${SKILL_MAX_LEVEL}，每级威力 +10%）。`),
+      h('p', { class: 'muted' }, `战斗中只能使用已装备的武学。每研读一本同名秘籍升一级（最高 Lv.${SKILL_MAX_LEVEL}，每级威力 +10%）。`),
       p.learned.map((id) => {
         const s = SKILLS[id];
         const on = p.skills.includes(id);
@@ -3967,26 +4125,61 @@ function renderShop(app, a) {
     if (e.kind === 'skill') {
       const s = SKILLS[e.id];
       const lv = p.learned.includes(e.id) ? levelOf(p, e.id) : 0;
-      const tip = lv === 0 ? '新武学' : lv >= SKILL_MAX_LEVEL ? `已满级 Lv.${lv}` : `已学 Lv.${lv}，买下升至 Lv.${lv + 1}`;
-      return { name: h('span', null, `📖 ${s.name}`), desc: `武学（${tip}）｜${skillLine(p, s)}` };
+      const tip = lv === 0 ? '新武学' : lv >= SKILL_MAX_LEVEL ? `已满级 Lv.${lv}` : `已学 Lv.${lv}`;
+      return { name: h('span', null, `📜 《${s.name}》秘籍`), desc: `${tip}，买回去自己决定学习还是卖｜${skillLine(p, s)}` };
     }
     return { name: h('span', null, `💊 ${ITEMS[e.id].name}`, !e.sold ? ` （余 ${e.stock}）` : ''), desc: `药品｜${ITEMS[e.id].desc}` };
   };
+  const selling = app.shopTab === 'sell';
+  const tabs = h('div', { class: 'tabs', role: 'tablist' },
+    [['buy', '购买'], ['sell', '出售']].map(([id, name]) =>
+      h('button', { class: 'tab', role: 'tab', 'aria-selected': String(app.shopTab === id), onclick: () => a.setShopTab(id) }, name)));
+  const buyList = h('div', { class: 'shop grow' }, shop.map((e, i) => {
+    const info = entryInfo(e);
+    const maxed = e.kind === 'skill' && p.learned.includes(e.id) && levelOf(p, e.id) >= SKILL_MAX_LEVEL;
+    return h('div', { class: `item-row ${e.sold ? 'sold' : ''}${e.kind === 'equip' ? ` rar-${e.item.rarity}` : ''}` },
+      h('div', { class: 'item-info' }, h('b', null, info.name), h('div', { class: 'muted' }, info.desc)),
+      h('button', {
+        class: 'seal small', disabled: e.sold || maxed || p.gold < e.price,
+        'aria-label': `购买${shopEntryName(e)}，${e.price} 金币`, onclick: () => a.buy(i),
+      }, e.sold ? '已售' : maxed ? '满级' : `${fmt(e.price)} 金`));
+  }));
+  // 出售：行囊里的装备、秘籍、已学会的武学、丹药
+  const gear = [...p.bag.equipment].sort(byRarity);
+  const pickCount = gear.filter((e) => app.sellPick.includes(e.rarity)).length;
+  const pickGold = gear.filter((e) => app.sellPick.includes(e.rarity)).reduce((sum, e) => sum + equipSellPrice(e), 0);
+  const books = Object.entries(p.bag.books || {});
+  const sellRow = (nameNode, desc, price, onclick, label) => h('div', { class: 'item-row' },
+    h('div', { class: 'item-info' }, h('b', null, nameNode), h('div', { class: 'muted' }, desc)),
+    h('button', { class: 'seal small', onclick, 'aria-label': label }, `卖 ${fmt(price)} 金`));
+  const sellList = h('div', { class: 'shop grow' },
+    h('p', { class: 'muted' }, '行商收购价低于他的卖价。穿在身上的装备要先卸下才能卖。'),
+    h('div', { class: 'bulk-sell' },
+      h('div', { class: 'muted' }, '一键出售：勾选要卖的品质'),
+      h('div', { class: 'row tight' }, RARITIES.map((r) => {
+        const n = gear.filter((e) => e.rarity === r).length;
+        const on = app.sellPick.includes(r);
+        return h('button', {
+          class: `chip r-${r}${on ? ' on' : ''}`, 'aria-pressed': String(on), disabled: !n && !on,
+          onclick: () => a.toggleSellPick(r),
+        }, `${RARITY_INFO[r].name} ${n}`);
+      })),
+      h('button', { class: 'seal small block', disabled: !pickCount, onclick: a.sellJunk }, pickCount ? `一键出售所选（${pickCount} 件，共 ${fmt(pickGold)} 金）` : '一键出售所选')),
+    gear.length ? h('h3', null, `装备（${gear.length}）`) : null,
+    gear.map((e) => sellRow(h('span', null, itemName(e), ' ', compareTag(p, e)), equipLine(e), equipSellPrice(e), () => a.sell('equip', e.uid), `卖出${e.name}`)),
+    books.length ? h('h3', null, '武学秘籍') : null,
+    books.map(([id, n]) => sellRow(`📜 《${SKILLS[id].name}》秘籍 ×${n}`, p.learned.includes(id) ? `已学 Lv.${levelOf(p, id)}` : '未学会', bookSellPrice(p, id), () => a.sell('book', id), `卖出${SKILLS[id].name}秘籍`)),
+    p.learned.length > 1 ? h('h3', null, '已学武学（卖掉等于遗忘）') : null,
+    p.learned.length > 1 ? p.learned.map((id) => sellRow(`${SKILLS[id].name} Lv.${levelOf(p, id)}`, p.skills.includes(id) ? '已装备' : '未装备', skillSellPrice(p, id), () => a.sell('skill', id), `遗忘并卖出${SKILLS[id].name}`)) : null,
+    Object.entries(p.items).some(([, n]) => n > 0) ? h('h3', null, '丹药') : null,
+    Object.entries(p.items).filter(([, n]) => n > 0).map(([id, n]) => sellRow(`💊 ${ITEMS[id].name} ×${n}`, ITEMS[id].desc, sellPrice(pillPrice(ITEMS[id], p.realm || 0)), () => a.sell('pill', id), `卖出${ITEMS[id].name}`)),
+    !gear.length && !books.length && p.learned.length <= 1 && !Object.values(p.items).some((n) => n > 0) ? h('p', { class: 'muted' }, '你身上没有可卖的东西。') : null);
   return h('section', { class: 'screen' },
     h('header', { class: 'topbar' },
       h('h1', { class: 'brand' }, '行商'),
       h('div', { class: 'gold', style: 'font-size:18px' }, `💰 ${fmt(p.gold)}`)),
-    h('p', { class: 'muted' }, '路边的行商摊开货物，每次带的东西都不一样。'),
-    h('div', { class: 'shop grow' }, shop.map((e, i) => {
-      const info = entryInfo(e);
-      const maxed = e.kind === 'skill' && p.learned.includes(e.id) && levelOf(p, e.id) >= SKILL_MAX_LEVEL;
-      return h('div', { class: `item-row ${e.sold ? 'sold' : ''}${e.kind === 'equip' ? ` rar-${e.item.rarity}` : ''}` },
-        h('div', { class: 'item-info' }, h('b', null, info.name), h('div', { class: 'muted' }, info.desc)),
-        h('button', {
-          class: 'seal small', disabled: e.sold || maxed || p.gold < e.price,
-          'aria-label': `购买${shopEntryName(e)}，${e.price} 金币`, onclick: () => a.buy(i),
-        }, e.sold ? '已售' : maxed ? '满级' : `${fmt(e.price)} 金`));
-    })),
+    tabs,
+    selling ? sellList : buyList,
     app.shopMsg ? h('p', { class: 'notice', role: 'status' }, rich(app.shopMsg)) : null,
     h('button', { class: 'seal primary block', onclick: a.leaveShop }, '告辞'),
   );
@@ -4136,6 +4329,7 @@ const HELP = [
       '历练时有几率遇到行商，也可能发现宝箱。宝箱会随机开出金币、装备、武学或药品。',
       '行商每次带的货都不一样：3 件随机装备、2 门武学、限量药品。刷新页面不会重新刷货。价格偏高，需要攒钱；丹修、商修有 9 折。',
       '价格随你的境界上涨，同时你的金币收入也随境界增加。',
+      '行商也收购东西：切到「出售」页，可以卖行囊里的装备、武学秘籍、已学会的武学（卖掉等于遗忘，至少要留一门）和丹药。收购价是原价的 40%，比买价低不少；还有「一键卖白/绿装备」。穿在身上的装备要先卸下才能卖。行囊装满时，新装备会自动按 35% 折算成金币。',
     ],
   },
   {
@@ -4152,8 +4346,8 @@ const HELP = [
     title: '武学与升级',
     lines: [
       '武学栏最多 4 个，战斗中只能使用已装备的武学。所有宗门的武学和装备都通用。',
-      '商店和掉落不会避开你已经学会的武学，想刷到某一门要碰运气。',
-      '重复获得同一门武学会让它升级：最高 Lv.5，每级威力 +10%。已满级再获得会折算成金币。',
+      '得到的武学是「秘籍」，放在行囊的「武学」页里，不会自动学习。你自己选：新武学点「学会」，已学会的点「升级」（最高 Lv.5，每级威力 +10%，每本秘籍升一级），或者带到行商处卖掉换金币。',
+      '商店和掉落不会避开你已经学会的武学，想刷到某一门要碰运气。满级的武学，秘籍只能卖掉。',
     ],
   },
   {
