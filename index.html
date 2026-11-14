@@ -443,17 +443,23 @@ textarea.code {
 }
 
 /* ---------- 插图（水墨背景 / logo / 怪物） ---------- */
-body.has-art {
-  background-image:
-    linear-gradient(var(--bg-veil), var(--bg-veil)),
-    var(--bg-art),
-    radial-gradient(ellipse at 50% 0%, var(--glow), transparent 55%);
-  background-repeat: no-repeat;
-  background-size: 100% 100%, cover, 100% 100%;
-  background-position: 0 0, center top, 0 0;
+/* 背景图单独做一层固定画布：浅色直接显示；深色反相成"暗底浅墨线"，并用滤色叠上去 */
+body.has-art::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg-art) center top / cover no-repeat;
+  opacity: 0.85;
 }
-:root { --bg-veil: rgba(244, 236, 216, 0.12); }
-@media (prefers-color-scheme: dark) { :root { --bg-veil: rgba(23, 19, 15, 0.9); } }
+@media (prefers-color-scheme: dark) {
+  body.has-art::after { filter: invert(1) hue-rotate(180deg) brightness(0.9); mix-blend-mode: screen; opacity: 0.5; }
+}
+/* 面板略透明，让山水从缝隙里透出来（字仍然清晰） */
+body.has-art .panel {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--paper-2) 80%, transparent), color-mix(in srgb, var(--paper-3) 80%, transparent));
+}
 
 /* 白底插图放在宣纸色底板上，用正片叠底让白色隐形，深色/浅色主题下都清楚 */
 .brand.has-logo::before { display: none; }
@@ -464,6 +470,34 @@ body.has-art {
   border-radius: 14px; background: #f4ecd8;
 }
 .enemy-row .face.art img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; display: block; pointer-events: none; }
+
+.tip { flex: none; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); border-left: 3px solid var(--cinnabar); padding: 2px 8px; background: color-mix(in srgb, var(--cinnabar) 8%, transparent); }
+
+/* 战斗日志区：背景更实，山水只剩若隐若现的一点影子，不干扰读字 */
+body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent); }
+
+/* 底部自动开关栏：探索页和战斗页位置固定，贴着整屏底部 */
+.auto-bar { flex: none; display: flex; gap: 8px; position: sticky; bottom: 0; }
+.auto-bar .seal { min-height: 40px; }
+.pill-row { flex: none; }
+.pill-auto { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.pill-auto select { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px; padding: 2px 2px; }
+.actions .pill-auto { flex-direction: column; gap: 1px; margin: 0; justify-content: center; font-size: 12px; min-height: 48px; border: 1px dashed var(--line); border-radius: 3px; }
+
+/* 选角页：周目与道果 */
+.dao-strip { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13.5px; color: var(--ink-2); padding: 0 2px; }
+.dao-strip .seal.step { min-width: 0; width: 30px; padding: 2px 0; min-height: 30px; }
+.dao-strip .seal.small { min-height: 30px; }
+
+/* 矮屏手机（如 iPhone SE，浏览器地址栏占掉一部分）：选角页收紧，保证一屏放得下 */
+@media (max-height: 700px) {
+  .screen { gap: 6px; padding-top: 6px; }
+  .card { min-height: 46px; padding-top: 4px; padding-bottom: 4px; }
+  .card .ico { font-size: 20px; }
+  .detail { min-height: 3.3em; font-size: 12.5px; }
+  .tip { font-size: 11.5px; line-height: 1.35; }
+  .dao-strip { font-size: 12.5px; }
+}
 
 </style>
 </head>
@@ -477,6 +511,7 @@ const __defs = {
 "main.js": function () {
 const { createRng } = __req("engine/rng.js");
 const { bgSrc } = __req("ui/portrait.js");
+const { settleRun, startNextCycle, buyUpgrade, buyRoot, daoGain } = __req("engine/dao.js");
 const { FAVICON } = __req("data/art.js");
 const { createNewRun, createEnemy, resetForBattle, recoverAfterBattle, walkRegen, restAtCamp, rollRoot, appendJournal, recomputePlayer } = __req("engine/state.js");
 const { pickEvent } = __req("engine/scheduler.js");
@@ -517,8 +552,7 @@ function getStorage() {
 }
 
 const randomSeed = () => (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-const freshSelection = (unlocks) => ({ sectId: null, root: rollRoot(createRng(randomSeed()), unlocks), rerolls: 0 });
-const SPEEDS = [1, 3, 10]; // 自动历练的倍速
+const freshSelection = (meta) => ({ sectId: null, root: rollRoot(createRng(randomSeed()), meta.unlocks), rerolls: 0, cycle: meta.cycle || 1 });
 
 const storage = getStorage();
 const loaded = loadGame(storage);
@@ -533,9 +567,8 @@ const app = {
   rng: null,
   auto: false, // 自动战斗
   autoExplore: false, // 自动历练（自动前进 + 自动战斗）
-  speed: 0, // SPEEDS 的下标
   autoConfig: { skillOrder: [], pillHpThreshold: 0.3 },
-  selection: freshSelection(loaded.save.meta.unlocks),
+  selection: freshSelection(loaded.save.meta),
   recovered: null,
   rewardText: '',
   shopMsg: '',
@@ -546,7 +579,7 @@ const app = {
 };
 let autoTimer = null;
 let exploreTimer = null;
-const delay = (ms) => Math.max(15, Math.round(ms / SPEEDS[app.speed]));
+const delay = (ms) => ms;
 
 function persist() {
   if (app.rng && app.save.run) app.save.run.rngState = app.rng.getState();
@@ -614,14 +647,22 @@ function tickExplore() {
   }
   const p = app.save.run.player;
   if (atGate(app.save.run)) return stopAutoExplore(`已走到「${bandAt(app.save.run.depth).name}」的尽头，要击败首领才能继续。自动历练已暂停，先休整好再点「突破」。`);
-  if (p.hp / p.stats.maxHp < 0.5 && (p.items.hp_pill || 0) > 0) actions.useItemOutside('hp_pill');
-  else if (p.hp / p.stats.maxHp < 0.3) return stopAutoExplore('生命过低且没有回春丹，已暂停自动历练。');
+  const hpRatio = p.hp / p.stats.maxHp;
+  const pillAt = app.autoConfig.pillHpThreshold > 0 ? Math.max(0.5, app.autoConfig.pillHpThreshold) : 0; // 赶路时要求比战斗中更稳：至少 50% 就吃
+  if (pillAt && hpRatio < pillAt && (p.items.hp_pill || 0) > 0) actions.useItemOutside('hp_pill');
+  else if (hpRatio < 0.3) return stopAutoExplore(pillAt ? '生命过低且没有回春丹，已暂停自动历练。' : '生命过低，已暂停自动历练（自动吃药已关闭）。');
   actions.explore();
   scheduleExplore();
 }
 
 const actions = {
   pickSect(id) { app.selection.sectId = id; render(); },
+  // 选择这一世玩第几周目（不超过已解锁的最高周目）：高周目太难时可以回到低周目
+  pickCycle(delta) {
+    const max = app.save.meta.cycle || 1;
+    app.selection.cycle = Math.min(max, Math.max(1, (app.selection.cycle || max) + delta));
+    render();
+  },
   reroll() {
     app.selection.root = rollRoot(createRng(randomSeed()), app.save.meta.unlocks);
     app.selection.rerolls += 1;
@@ -631,7 +672,7 @@ const actions = {
     const { sectId, root } = app.selection;
     if (!sectId) return;
     const seed = randomSeed();
-    app.save.run = createNewRun({ sectId, rootId: root.rootId, quality: root.quality, seed });
+    app.save.run = createNewRun({ sectId, rootId: root.rootId, quality: root.quality, seed, cycle: app.selection.cycle || 1, dao: app.save.meta.upgrades || {} });
     app.rng = createRng(seed);
     app.notice = '';
     appendJournal(app.save.run, [{ text: '你踏入青云山脉，修行之路就此开始。', kind: 'info' }]);
@@ -653,7 +694,7 @@ const actions = {
     }
     const event = pickEvent(EVENTS, { depth: run.depth }, app.rng);
     if (event.id === 'battle' || event.id === 'moxiu') {
-      const enemy = createEnemy(app.rng.pick(event.monsters), run.depth);
+      const enemy = createEnemy(app.rng.pick(event.monsters), run.depth, run.cycle || 1);
       resetForBattle(run.player);
       app.battle = createBattle({ player: run.player, enemy, rng: app.rng });
       app.screen = 'battle';
@@ -745,7 +786,6 @@ const actions = {
         run.demon.won = true;
         run.demon.inside = false;
         app.save.meta.endings = (app.save.meta.endings || 0) + 1;
-        app.save.meta.dao = (app.save.meta.dao || 0) + 10;
         lines.push({ text: `击败了天道代行者！${app.rewardText}`, kind: 'gold' });
       } else {
         lines.push({ text: `通过试炼，获得心魔碎片（${run.demon.shards.length}/${SHARDS_NEEDED}）。${app.rewardText}`, kind: 'gold' });
@@ -770,7 +810,7 @@ const actions = {
     clearTimeout(exploreTimer);
     app.autoExplore = false;
     app.rng = createRng(run.rngState);
-    const boss = createBoss(run.player.realm);
+    const boss = createBoss(run.player.realm, run.cycle || 1);
     resetForBattle(run.player);
     app.battle = createBattle({ player: run.player, enemy: boss, rng: app.rng });
     appendJournal(run, [{ text: `—— 突破 · 挑战「${boss.name}」——`, kind: 'head' }]);
@@ -886,11 +926,48 @@ const actions = {
     } else {
       clearTimeout(exploreTimer);
       app.autoExplore = false;
+      const run = app.save.run;
+      const gain = settleRun(app.save.meta, run);
       app.save = clearRun(storage, app.save);
-      app.selection = freshSelection(app.save.meta.unlocks);
-      app.notice = '你已身死道消。带着模糊的记忆，重新踏上仙途吧。';
+      app.selection = freshSelection(app.save.meta);
+      app.notice = `你已身死道消，止步第 ${run.depth.toLocaleString('en-US')} 层。带着模糊的记忆，获得道果 ${gain}，重新踏上仙途吧。`;
       app.screen = 'select';
     }
+    render();
+  },
+
+  // ---- 道果与轮回 ----
+  openDao() { app.dialog = { type: 'dao', msg: '' }; render(); },
+  buyDaoUpgrade(id) {
+    const r = buyUpgrade(app.save.meta, id);
+    app.dialog = { type: 'dao', msg: r.msg };
+    persist();
+    render();
+  },
+  buyDaoRoot(id) {
+    const r = buyRoot(app.save.meta, id);
+    app.dialog = { type: 'dao', msg: r.msg };
+    persist();
+    render();
+  },
+  // 通关后轮回转世：结算道果，进入下一周目
+  rebirth() {
+    const run = app.save.run;
+    if (!run || !run.demon.won) return;
+    const gain = daoGain(run.depth, run.cycle || 1, true);
+    if (!window.confirm(`轮回转世会结束这一世（走到第 ${run.depth.toLocaleString('en-US')} 层），获得道果 ${gain}，并进入第 ${(app.save.meta.cycle || 1) + 1} 周目：敌人更强，但你可以用道果强化之后的每一世。确定转世吗？`)) return;
+    clearTimeout(autoTimer);
+    clearTimeout(exploreTimer);
+    settleRun(app.save.meta, run, { rebirth: true });
+    const cycle = startNextCycle(app.save.meta);
+    app.save = clearRun(storage, app.save);
+    app.battle = null;
+    app.auto = false;
+    app.autoExplore = false;
+    app.dialog = null;
+    app.selection = freshSelection(app.save.meta);
+    app.notice = `轮回转世，获得道果 ${gain}。第 ${cycle} 周目开始：敌人变强了，去「道果加持」里强化自己吧。`;
+    app.screen = 'select';
     render();
   },
 
@@ -920,10 +997,6 @@ const actions = {
       }
       render();
     }
-  },
-  cycleSpeed() {
-    app.speed = (app.speed + 1) % SPEEDS.length;
-    render();
   },
 
   // 行囊
@@ -965,7 +1038,7 @@ const actions = {
       app.battle = null;
       app.auto = false;
       app.autoExplore = false;
-      app.selection = freshSelection(app.save.meta.unlocks);
+      app.selection = freshSelection(app.save.meta);
       app.screen = startScreen(imported);
       app.notice = '存档已导入。';
     } catch (e) {
@@ -982,7 +1055,7 @@ const actions = {
     app.auto = false;
     app.autoExplore = false;
     app.dialog = null;
-    app.selection = freshSelection(app.save.meta.unlocks);
+    app.selection = freshSelection(app.save.meta);
     app.notice = '';
     app.screen = 'select';
     render();
@@ -1074,6 +1147,128 @@ const FAVICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC
 
 return { ART, FAVICON };
 },
+"engine/dao.js": function () {
+// 道果与周目：结算、购买加成、解锁灵根、转世
+const { DAO_UPGRADES, ROOT_UNLOCK_COST, upgradeCost, DAO_PER_DEPTH, REBIRTH_BONUS, CYCLE_DAO_BONUS } = __req("data/dao.js");
+const { ROOTS } = __req("data/roots.js");
+
+const upgradeLevel = (meta, id) => (meta.upgrades && meta.upgrades[id]) || 0;
+
+// 一世结束的道果：转世额外 +REBIRTH_BONUS，且按 1.5 倍层数结算
+function daoGain(depth, cycle = 1, rebirth = false) {
+  const base = Math.floor(depth * DAO_PER_DEPTH * (rebirth ? 1.5 : 1)) + (rebirth ? REBIRTH_BONUS : 0);
+  return Math.floor(base * (1 + CYCLE_DAO_BONUS * (Math.max(1, cycle) - 1)));
+}
+
+// 结束这一世：记录最远层数，加道果。返回获得的道果
+function settleRun(meta, run, { rebirth = false } = {}) {
+  const gain = daoGain(run.depth, run.cycle || 1, rebirth);
+  meta.dao = (meta.dao || 0) + gain;
+  meta.best = Math.max(meta.best || 0, run.depth);
+  meta.rebirths = (meta.rebirths || 0) + 1;
+  return gain;
+}
+
+// 通关后选择轮回转世：进入下一周目
+function startNextCycle(meta) {
+  meta.cycle = (meta.cycle || 1) + 1;
+  return meta.cycle;
+}
+
+function buyUpgrade(meta, id) {
+  const def = DAO_UPGRADES.find((u) => u.id === id);
+  if (!def) return { ok: false, msg: '没有这一项加持' };
+  if (!meta.upgrades) meta.upgrades = {};
+  const lv = upgradeLevel(meta, id);
+  if (lv >= def.max) return { ok: false, msg: `${def.name}已修到最高` };
+  const cost = upgradeCost(lv);
+  if ((meta.dao || 0) < cost) return { ok: false, msg: `道果不足（需要 ${cost}）` };
+  meta.dao -= cost;
+  meta.upgrades[id] = lv + 1;
+  return { ok: true, msg: `${def.name} 升至 ${lv + 1} 级` };
+}
+
+function buyRoot(meta, id) {
+  const cost = ROOT_UNLOCK_COST[id];
+  if (!cost || !ROOTS[id]) return { ok: false, msg: '这个灵根无法解锁' };
+  if (!meta.unlocks) meta.unlocks = [];
+  if (meta.unlocks.includes(id)) return { ok: false, msg: '已经解锁' };
+  if ((meta.dao || 0) < cost) return { ok: false, msg: `道果不足（需要 ${cost}）` };
+  meta.dao -= cost;
+  meta.unlocks.push(id);
+  return { ok: true, msg: `解锁${ROOTS[id].name}，刷新灵根时可能出现` };
+}
+
+return { upgradeLevel, daoGain, settleRun, startNextCycle, buyUpgrade, buyRoot };
+},
+"data/dao.js": function () {
+// 道果：每次修行结束（身死道消或轮回转世）按走到的层数获得，用来永久强化之后的每一世，或解锁变异灵根
+// 加成类每级效果固定、费用逐级上涨；效果在 recomputePlayer 里按总属性（含装备）计算，所以后期依然有用
+const DAO_UPGRADES = [
+  { id: 'body', name: '道体', icon: '🛡️', desc: '生命、防御 +3% / 级', max: 20, per: 0.03 },
+  { id: 'might', name: '神通', icon: '⚔️', desc: '攻击 +3% / 级', max: 20, per: 0.03 },
+  { id: 'fortune', name: '财运', icon: '💰', desc: '金币收入 +5% / 级', max: 10, per: 0.05 },
+  { id: 'stock', name: '行囊', icon: '🎒', desc: '开局多 100 金币、1 颗回春丹 / 级', max: 5, per: 1 },
+];
+
+// 变异灵根的解锁费用（解锁后刷新灵根时可能刷出）
+const ROOT_UNLOCK_COST = { lei: 60, bing: 60, feng: 60, an: 80 };
+
+// 第 level 级升到 level+1 级的费用（level 从 0 开始）
+const upgradeCost = (level) => 10 + 6 * level;
+
+// 一世结束时获得的道果：按走到的层数，周目越高越多；轮回转世（通关后主动转世）额外有奖励
+const DAO_PER_DEPTH = 1 / 50;
+const REBIRTH_BONUS = 30;
+const CYCLE_DAO_BONUS = 0.25; // 每高一个周目，道果多 25%
+
+return { DAO_UPGRADES, ROOT_UNLOCK_COST, upgradeCost, DAO_PER_DEPTH, REBIRTH_BONUS, CYCLE_DAO_BONUS };
+},
+"data/roots.js": function () {
+// 灵根品质：决定灵根属性加成的强弱倍率，weight 为刷新时的出现权重
+const QUALITIES = [
+  { id: 'za', name: '杂', mul: 0.5, weight: 25 },
+  { id: 'pu', name: '普', mul: 1, weight: 50 },
+  { id: 'you', name: '优', mul: 1.5, weight: 20 },
+  { id: 'tian', name: '天', mul: 2.2, weight: 5 },
+];
+
+function getQuality(id) {
+  return QUALITIES.find((q) => q.id === id) || QUALITIES[1];
+}
+
+const STAT_LABELS = { maxHp: '生命', atk: '攻击', def: '防御', maxMp: '灵力', spd: '身法', crit: '暴击率', critDmg: '暴击伤害' };
+
+// 把灵根在某品质下的实际加成写成文字，如「攻击 +22%」
+function describeRoot(root, qualityId) {
+  const q = getQuality(qualityId).mul;
+  const parts = [];
+  for (const [k, v] of Object.entries(root.statMul || {})) {
+    const pct = Math.round((v - 1) * q * 100);
+    if (pct !== 0) parts.push(`${STAT_LABELS[k]} ${pct > 0 ? '+' : ''}${pct}%`);
+  }
+  for (const [k, v] of Object.entries(root.statAdd || {})) {
+    const pct = Math.round(v * q * 100);
+    if (pct !== 0) parts.push(`${STAT_LABELS[k]} ${pct > 0 ? '+' : ''}${pct}%`);
+  }
+  return parts.join('，');
+}
+
+// 灵根：决定元素与属性倾向。locked:true 的变异灵根需用道果解锁（子项目⑤）
+const ROOTS = {
+  jin: { id: 'jin', name: '金灵根', element: '金', desc: '锋锐，攻击 +10%', statMul: { atk: 1.1 }, locked: false },
+  mu: { id: 'mu', name: '木灵根', element: '木', desc: '生机，生命 +10%', statMul: { maxHp: 1.1 }, locked: false },
+  shui: { id: 'shui', name: '水灵根', element: '水', desc: '绵长，灵力 +20%', statMul: { maxMp: 1.2 }, locked: false },
+  huo: { id: 'huo', name: '火灵根', element: '火', desc: '炽烈，攻击 +15%，防御 -5%', statMul: { atk: 1.15, def: 0.95 }, locked: false },
+  tu: { id: 'tu', name: '土灵根', element: '土', desc: '厚重，防御 +20%，生命 +5%', statMul: { def: 1.2, maxHp: 1.05 }, locked: false },
+  lei: { id: 'lei', name: '雷灵根', element: '雷', desc: '变异：暴击率 +10%', statAdd: { crit: 0.1 }, locked: true },
+  bing: { id: 'bing', name: '冰灵根', element: '冰', desc: '变异：灵力 +10%，防御 +10%', statMul: { maxMp: 1.1, def: 1.1 }, locked: true },
+  feng: { id: 'feng', name: '风灵根', element: '风', desc: '变异：身法 +25%', statMul: { spd: 1.25 }, locked: true },
+  an: { id: 'an', name: '暗灵根', element: '暗', desc: '变异：暴击伤害 +30%', statAdd: { critDmg: 0.3 }, locked: true },
+};
+
+return { QUALITIES, getQuality, describeRoot, ROOTS };
+},
 "engine/state.js": function () {
 const { SECTS } = __req("data/sects.js");
 const { ROOTS, QUALITIES, getQuality } = __req("data/roots.js");
@@ -1135,6 +1330,11 @@ function recomputePlayer(p) {
     for (const e of it.effects || []) effects.push(clone(e));
     for (const [k, v] of Object.entries(it.mods || {})) mods[k] = (mods[k] || 0) + v;
   }
+  // 道果加持：按总属性（含装备）计算
+  const dao = p.dao || {};
+  if (dao.body) { stats.maxHp = Math.round(stats.maxHp * (1 + 0.03 * dao.body)); stats.def = Math.round(stats.def * (1 + 0.03 * dao.body)); }
+  if (dao.might) stats.atk = Math.round(stats.atk * (1 + 0.03 * dao.might));
+  if (dao.fortune) mods.goldMul = (mods.goldMul || 0) + 0.05 * dao.fortune;
   stats.crit = Math.min(CRIT_CAP, Math.round(stats.crit * 1000) / 1000);
   p.lv = p.realm + Math.log(1 + 0.25 * p.stage) / Math.log(1.7); // 等级：用于把防御按等级归一化
   p.stats = stats;
@@ -1148,13 +1348,14 @@ function recomputePlayer(p) {
   return p;
 }
 
-function createPlayer({ sectId, rootId, quality = 'pu', name = '你' }) {
+function createPlayer({ sectId, rootId, quality = 'pu', name = '你', cycle = 1, dao = {} }) {
   const sect = SECTS[sectId];
   const root = ROOTS[rootId];
   if (!sect) throw new Error(`未知宗门: ${sectId}`);
   if (!root) throw new Error(`未知灵根: ${rootId}`);
   const items = { ...DEFAULT_ITEMS };
   for (const [id, n] of Object.entries(sect.startItems || {})) items[id] = (items[id] || 0) + n;
+  items.hp_pill += dao.stock || 0;
   const p = {
     id: 'player',
     name,
@@ -1169,7 +1370,9 @@ function createPlayer({ sectId, rootId, quality = 'pu', name = '你' }) {
     hp: 0,
     mp: 0,
     shield: 0,
-    gold: START_GOLD,
+    gold: START_GOLD + 100 * (dao.stock || 0),
+    cycle, // 第几周目：敌人强度随周目提高
+    dao: { ...dao }, // 道果加持等级（永久强化）
     skills: [...sect.starterSkills], // 武学栏（已装备的武学）
     learned: [...sect.starterSkills], // 已学会的全部武学
     skillLevels: Object.fromEntries(sect.starterSkills.map((id) => [id, 1])), // 武学等级，重复获得会升级
@@ -1189,11 +1392,11 @@ function createPlayer({ sectId, rootId, quality = 'pu', name = '你' }) {
 }
 
 // 生成敌人：depth 为所在层数，数值按深度连续放大，名字随区域变化。depth 缺省为 0（炼气期起点）
-function createEnemy(monsterId, depth = 0) {
+function createEnemy(monsterId, depth = 0, cycle = 1) {
   const m = MONSTERS[monsterId];
   if (!m) throw new Error(`未知怪物: ${monsterId}`);
   const f = realmFloat(depth);
-  const k = enemyPower(depth);
+  const k = enemyPower(depth, cycle);
   const g = growth(f);
   const b = m.stats;
   const maxMp = Math.round(b.maxMp * (1 + 0.5 * f));
@@ -1245,11 +1448,15 @@ const REGEN = {
   battle: [0.25, 0.4], // 战斗胜利后
   walk: [0.04, 0.08], // 每前进一层（赶路）
   camp: [0.4, 0.5], // 营地休息
+  // 战后调息随境界递减：炼气期照常，越往后恢复越少，逼玩家靠丹药、营地和装备撑过去（下限 battleFloor）
+  battleDecay: 0.05, // 每升一个大境界，战后恢复少 5%（相对炼气期）
+  battleFloor: 0.5,
 };
 
 // 战斗胜利后的恢复
 function recoverAfterBattle(unit) {
-  return restore(unit, REGEN.battle[0], REGEN.battle[1]);
+  const k = Math.max(REGEN.battleFloor, 1 - REGEN.battleDecay * (unit.realm || 0));
+  return restore(unit, REGEN.battle[0] * k, REGEN.battle[1] * k);
 }
 
 // 赶路回复：每前进一层，慢慢恢复一点
@@ -1270,9 +1477,10 @@ function appendJournal(run, entries, max = 120) {
   return run.journal;
 }
 
-function createNewRun({ sectId, rootId, quality = 'pu', seed }) {
+function createNewRun({ sectId, rootId, quality = 'pu', seed, cycle = 1, dao = {} }) {
   return {
-    player: createPlayer({ sectId, rootId, quality }),
+    cycle,
+    player: createPlayer({ sectId, rootId, quality, cycle, dao }),
     region: 'qingyun',
     depth: 0,
     kills: 0,
@@ -1381,51 +1589,6 @@ const SECTS = {
 };
 
 return { SECTS };
-},
-"data/roots.js": function () {
-// 灵根品质：决定灵根属性加成的强弱倍率，weight 为刷新时的出现权重
-const QUALITIES = [
-  { id: 'za', name: '杂', mul: 0.5, weight: 25 },
-  { id: 'pu', name: '普', mul: 1, weight: 50 },
-  { id: 'you', name: '优', mul: 1.5, weight: 20 },
-  { id: 'tian', name: '天', mul: 2.2, weight: 5 },
-];
-
-function getQuality(id) {
-  return QUALITIES.find((q) => q.id === id) || QUALITIES[1];
-}
-
-const STAT_LABELS = { maxHp: '生命', atk: '攻击', def: '防御', maxMp: '灵力', spd: '身法', crit: '暴击率', critDmg: '暴击伤害' };
-
-// 把灵根在某品质下的实际加成写成文字，如「攻击 +22%」
-function describeRoot(root, qualityId) {
-  const q = getQuality(qualityId).mul;
-  const parts = [];
-  for (const [k, v] of Object.entries(root.statMul || {})) {
-    const pct = Math.round((v - 1) * q * 100);
-    if (pct !== 0) parts.push(`${STAT_LABELS[k]} ${pct > 0 ? '+' : ''}${pct}%`);
-  }
-  for (const [k, v] of Object.entries(root.statAdd || {})) {
-    const pct = Math.round(v * q * 100);
-    if (pct !== 0) parts.push(`${STAT_LABELS[k]} ${pct > 0 ? '+' : ''}${pct}%`);
-  }
-  return parts.join('，');
-}
-
-// 灵根：决定元素与属性倾向。locked:true 的变异灵根需用道果解锁（子项目⑤）
-const ROOTS = {
-  jin: { id: 'jin', name: '金灵根', element: '金', desc: '锋锐，攻击 +10%', statMul: { atk: 1.1 }, locked: false },
-  mu: { id: 'mu', name: '木灵根', element: '木', desc: '生机，生命 +10%', statMul: { maxHp: 1.1 }, locked: false },
-  shui: { id: 'shui', name: '水灵根', element: '水', desc: '绵长，灵力 +20%', statMul: { maxMp: 1.2 }, locked: false },
-  huo: { id: 'huo', name: '火灵根', element: '火', desc: '炽烈，攻击 +15%，防御 -5%', statMul: { atk: 1.15, def: 0.95 }, locked: false },
-  tu: { id: 'tu', name: '土灵根', element: '土', desc: '厚重，防御 +20%，生命 +5%', statMul: { def: 1.2, maxHp: 1.05 }, locked: false },
-  lei: { id: 'lei', name: '雷灵根', element: '雷', desc: '变异：暴击率 +10%', statAdd: { crit: 0.1 }, locked: true },
-  bing: { id: 'bing', name: '冰灵根', element: '冰', desc: '变异：灵力 +10%，防御 +10%', statMul: { maxMp: 1.1, def: 1.1 }, locked: true },
-  feng: { id: 'feng', name: '风灵根', element: '风', desc: '变异：身法 +25%', statMul: { spd: 1.25 }, locked: true },
-  an: { id: 'an', name: '暗灵根', element: '暗', desc: '变异：暴击伤害 +30%', statAdd: { critDmg: 0.3 }, locked: true },
-};
-
-return { QUALITIES, getQuality, describeRoot, ROOTS };
 },
 "data/monsters.js": function () {
 // 敌人模板（炼气期基础数值）。深度越深，数值按区域放大，名字也随区域变化（names 按区域顺序）
@@ -1643,6 +1806,10 @@ const BANDS = [
 const ENDLESS_SPAN = 1500; // 无尽区域里每过多少层，敌人强度提高一个大境界
 const ENEMY_ATK = 0.45; // 敌人攻击的全局系数：要连续打几千场，一场战斗只应消耗一部分生命，由模拟器标定
 const ENEMY_EXTRA = 0.30; // 敌人强度额外的线性加成（1 + ENEMY_EXTRA × 境界浮点数），由模拟器调平衡
+// 后期加陡：从 LATE_FROM 境界起，每多一个境界，敌人再额外 ×LATE_GROWTH。装备堆起来之后玩家成长会超过普通曲线，靠这一项把后期拉回来
+// 做成对象是为了让模拟器能临时改值来标定；游戏里不会修改
+const CURVE = { lateFrom: 4, lateGrowth: 1.2, cycleStep: 0.12 };
+// 周目：每多一个周目，所有敌人的生命、攻击、防御同时 +cycleStep（第 n 周目 = 1 + cycleStep × (n-1)）。生命和攻击一起涨，实际难度约为它的平方，所以步长要小
 
 // 瓶颈首领：每个大境界突破前必须击败。数值是同境界末期普通敌人的数倍
 const BOSS = {
@@ -1653,11 +1820,11 @@ const BOSS = {
   elements: ['火', '木', '水', '土', '金', '暗', '火', '土'],
 };
 
-return { BANDS, ENDLESS_SPAN, ENEMY_ATK, ENEMY_EXTRA, BOSS };
+return { BANDS, ENDLESS_SPAN, ENEMY_ATK, ENEMY_EXTRA, CURVE, BOSS };
 },
 "engine/world.js": function () {
 // 世界：由层数得到所在区域、敌人强度（连续增长）
-const { BANDS, ENDLESS_SPAN, ENEMY_EXTRA } = __req("data/world.js");
+const { BANDS, ENDLESS_SPAN, ENEMY_EXTRA, CURVE } = __req("data/world.js");
 const { growth } = __req("data/equipment.js");
 
 function bandIndexAt(depth) {
@@ -1674,13 +1841,20 @@ function realmFloat(depth) {
   return b.realm + (depth - b.from) / span;
 }
 
-// 敌人属性（生命、攻击、防御）的放大倍数
-function enemyPower(depth) {
-  const f = realmFloat(depth);
-  return growth(f) * (1 + ENEMY_EXTRA * f);
+// 后期加陡的倍数：LATE_FROM 境界之前为 1
+const lateMul = (f) => Math.pow(CURVE.lateGrowth, Math.max(0, f - CURVE.lateFrom));
+
+// 周目倍数：第 1 周目为 1
+const cycleMul = (cycle = 1) => 1 + CURVE.cycleStep * (Math.max(1, cycle) - 1);
+
+// 敌人属性（生命、攻击、防御）的放大倍数。f 为境界浮点数
+const powerAt = (f, cycle = 1) => growth(f) * (1 + ENEMY_EXTRA * f) * lateMul(f) * cycleMul(cycle);
+
+function enemyPower(depth, cycle = 1) {
+  return powerAt(realmFloat(depth), cycle);
 }
 
-return { bandIndexAt, bandAt, realmFloat, enemyPower };
+return { bandIndexAt, bandAt, realmFloat, lateMul, cycleMul, powerAt, enemyPower };
 },
 "engine/scheduler.js": function () {
 // 事件调度：按权重在事件表中挑选，when(ctx) 为假的条目被排除
@@ -1705,7 +1879,7 @@ const { SLOTS } = __req("data/equipment.js");
 const { bandIndexAt } = __req("engine/world.js");
 const { realmStageAt } = __req("engine/progress.js");
 
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 const SAVE_KEY = 'xiantu:save';
 
 // MIGRATIONS[n] 把 n 版存档转换为 n+1 版。游戏更新存档结构时在这里追加
@@ -1797,10 +1971,22 @@ const MIGRATIONS = {
     }
     return out;
   },
+  // v7 → v8：新增周目与道果加持。进行中的修行视为第 1 周目，没有道果加成
+  7: (save) => {
+    const out = { ...save };
+    if (out.run) {
+      if (!out.run.cycle) out.run.cycle = 1;
+      if (out.run.player) {
+        if (!out.run.player.cycle) out.run.player.cycle = 1;
+        if (!out.run.player.dao) out.run.player.dao = {};
+      }
+    }
+    return out;
+  },
 };
 
 function createNewMeta() {
-  return { dao: 0, codex: [], achievements: [], unlocks: [], rebirths: 0, endings: 0 };
+  return { dao: 0, codex: [], achievements: [], unlocks: [], rebirths: 0, endings: 0, cycle: 1, upgrades: {}, best: 0 };
 }
 
 function createNewSave() {
@@ -1958,7 +2144,7 @@ const { BANDS, BOSS, ENEMY_ATK, ENEMY_EXTRA } = __req("data/world.js");
 const { REALMS } = __req("data/realms.js");
 const { growth } = __req("data/equipment.js");
 const { recomputePlayer } = __req("engine/state.js");
-const { bandIndexAt } = __req("engine/world.js");
+const { bandIndexAt, powerAt } = __req("engine/world.js");
 
 const MAX_REALM = REALMS.length - 1; // 渡劫；之后的无尽仙界境界不再提升
 
@@ -2001,9 +2187,9 @@ function advancePastGate(run) {
 }
 
 // 瓶颈首领：强度相当于下一个境界起点的普通敌人，但生命、攻击高得多
-function createBoss(realm) {
+function createBoss(realm, cycle = 1) {
   const f = realm + 1;
-  const k = growth(f) * (1 + ENEMY_EXTRA * f);
+  const k = powerAt(f, cycle);
   const s = BOSS.stats;
   return {
     id: `boss_${realm}`,
@@ -2650,12 +2836,13 @@ const { TRIALS, FINAL, TRIAL_BASE, FINAL_BASE, TRIAL_POWER, FINAL_POWER, SHARDS_
 const { ENEMY_ATK, ENEMY_EXTRA } = __req("data/world.js");
 const { growth } = __req("data/equipment.js");
 const { generateEquipment } = __req("engine/loot.js");
+const { cycleMul } = __req("engine/world.js");
 
 const trialById = (id) => TRIALS.find((t) => t.id === id);
 
 function build(base, tpl, player, power) {
   const lv = player.lv || 0;
-  const k = growth(lv) * (1 + ENEMY_EXTRA * lv) * power;
+  const k = growth(lv) * (1 + ENEMY_EXTRA * lv) * power * cycleMul(player.cycle || 1);
   const maxHp = Math.round(base.maxHp * k);
   const maxMp = Math.round(base.maxMp * (1 + 0.5 * lv));
   return {
@@ -3427,6 +3614,8 @@ const { shopEntryName } = __req("engine/shop.js");
 const { TRIALS, FINAL, SHARDS_NEEDED, ENDING } = __req("data/demon.js");
 const { RULE_INFO } = __req("combat/rules.js");
 const { portraitSrc, logoSrc } = __req("ui/portrait.js");
+const { DAO_UPGRADES, ROOT_UNLOCK_COST, upgradeCost } = __req("data/dao.js");
+const { upgradeLevel, daoGain } = __req("engine/dao.js");
 const { canSummon, trialCleared } = __req("engine/demon.js");
 const { splitRarity } = __req("ui/richtext.js");
 
@@ -3577,14 +3766,41 @@ function modal(app, a) {
   } else if (d.type === 'ending') {
     const run = app.save.run;
     const p = run.player;
+    const cycle = app.save.meta.cycle || 1;
     body = [
       h('h2', null, '结局 · 道心圆满'),
       ENDING.map((l) => h('p', null, l)),
       h('h3', null, '这一路'),
-      h('p', null, `${SECTS[p.sectId].name} · ${getQuality(p.rootQuality || 'pu').name}·${ROOTS[p.rootId].name}，走到第 ${run.depth.toLocaleString('en-US')} 层，斩杀 ${run.kills.toLocaleString('en-US')} 只妖兽与魔修，境界「${realmName(p.realm, p.stage)}」。`),
-      h('p', { class: 'muted' }, `通关次数：${app.save.meta.endings}　道果 +10（用途将在后续版本开放）`),
-      h('p', null, '你可以继续修行，向更深处走去。'),
-      h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '继续修行')),
+      h('p', null, `第 ${cycle} 周目 · ${SECTS[p.sectId].name} · ${getQuality(p.rootQuality || 'pu').name}·${ROOTS[p.rootId].name}，走到第 ${run.depth.toLocaleString('en-US')} 层，斩杀 ${run.kills.toLocaleString('en-US')} 只妖兽与魔修，境界「${realmName(p.realm, p.stage)}」。`),
+      h('p', { class: 'muted' }, `通关次数：${app.save.meta.endings}`),
+      h('p', null, `你可以继续向更深处走去；也可以「轮回转世」：结束这一世，获得道果 ${daoGain(run.depth, run.cycle || 1, true)}，进入第 ${cycle + 1} 周目——敌人更强，但道果能永久强化之后的每一世。`),
+      h('div', { class: 'btns' },
+        h('button', { class: 'seal', onclick: a.closeDialog }, '继续修行'),
+        h('button', { class: 'seal primary', onclick: a.rebirth }, '轮回转世')),
+    ];
+  } else if (d.type === 'dao') {
+    const meta = app.save.meta;
+    body = [
+      h('h2', null, '道果加持'),
+      h('p', { class: 'muted' }, `道果 ${meta.dao || 0}。身死道消或轮回转世时按走到的层数获得，加持永久生效，从下一世起作用。`),
+      d.msg ? h('p', { class: 'notice', role: 'status' }, d.msg) : null,
+      DAO_UPGRADES.map((u) => {
+        const lv = upgradeLevel(meta, u.id);
+        const maxed = lv >= u.max;
+        const cost = upgradeCost(lv);
+        return h('div', { class: 'item-row' },
+          h('div', { class: 'item-info' }, h('b', null, `${u.icon} ${u.name} Lv.${lv}/${u.max}`), h('div', { class: 'muted' }, u.desc)),
+          h('button', { class: 'seal small', disabled: maxed || (meta.dao || 0) < cost, onclick: () => a.buyDaoUpgrade(u.id) }, maxed ? '已满' : `${cost} 道果`));
+      }),
+      h('h3', { style: 'margin-top:8px' }, '变异灵根'),
+      Object.entries(ROOT_UNLOCK_COST).map(([id, cost]) => {
+        const r = ROOTS[id];
+        const owned = (meta.unlocks || []).includes(id);
+        return h('div', { class: 'item-row' },
+          h('div', { class: 'item-info' }, h('b', null, r.name), h('div', { class: 'muted' }, r.desc)),
+          h('button', { class: 'seal small', disabled: owned || (meta.dao || 0) < cost, onclick: () => a.buyDaoRoot(id) }, owned ? '已解锁' : `${cost} 道果`));
+      }),
+      h('div', { class: 'btns' }, h('button', { class: 'seal primary', onclick: a.closeDialog }, '关闭')),
     ];
   } else if (d.type === 'menu') {
     body = [
@@ -3594,6 +3810,8 @@ function modal(app, a) {
         h('button', { class: 'seal', onclick: a.openAbout }, '关于 / 作者名单'),
         h('button', { class: 'seal', onclick: a.openExport }, '导出存档码'),
         h('button', { class: 'seal', onclick: a.openImport }, '导入存档码'),
+        h('button', { class: 'seal', onclick: a.openDao }, '道果加持'),
+        app.save.run && app.save.run.demon.won ? h('button', { class: 'seal', onclick: a.rebirth }, '轮回转世') : null,
         app.save.run ? h('button', { class: 'seal', onclick: a.abandon }, '放弃本次修行') : null,
         h('button', { class: 'seal primary', onclick: a.closeDialog }, '关闭')),
     ];
@@ -3626,6 +3844,21 @@ function modal(app, a) {
 }
 
 // ---------- 入道：选宗门 + 刷灵根 ----------
+
+// 自动开关栏：探索页和战斗页都放在整屏的最底部，位置固定
+function autoBar(app, a, { trial = false } = {}) {
+  return h('div', { class: 'auto-bar', role: 'group', 'aria-label': '自动开关' },
+    h('button', { class: `seal small grow-btn ${app.auto ? 'on' : ''}`, 'aria-pressed': String(app.auto), onclick: a.toggleAuto }, app.auto ? '自动战斗：开' : '自动战斗：关'),
+    h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, disabled: trial, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关'));
+}
+
+// 自动吃药：生命低于这个比例时自动吃回春丹，放在丹药旁边
+function pillAuto(app, a) {
+  return h('label', { class: 'pill-auto', title: '生命低于这个比例时，自动吃回春丹' }, '自动吃药',
+    h('select', { 'aria-label': '自动吃回春丹的生命阈值', onchange: (ev) => a.setPillThreshold(Number(ev.target.value)) },
+      [[0, '关'], [0.3, '<30%'], [0.5, '<50%']].map(([v, t]) => h('option', { value: String(v), selected: app.autoConfig.pillHpThreshold === v }, t))));
+}
+
 function renderSelect(app, a) {
   const { sectId, root, rerolls } = app.selection;
   const sect = sectId ? SECTS[sectId] : null;
@@ -3643,8 +3876,16 @@ function renderSelect(app, a) {
         ? `「${followers.join('」「')}」的属性跟随你的灵根，这个灵根暂无同源加成`
         : '这个灵根与该宗门武学不同源，换一个更合适')
       : h('p', { class: 'muted' }, '选好宗门后，这里会提示同源武学');
+  const meta = app.save.meta;
   return h('section', { class: 'screen' },
     topbar(a),
+    h('div', { class: 'dao-strip' },
+      h('span', { class: 'row tight' },
+        (meta.cycle || 1) > 1 ? h('button', { class: 'seal small step', 'aria-label': '降低周目', disabled: (app.selection.cycle || 1) <= 1, onclick: () => a.pickCycle(-1) }, '◀') : null,
+        h('b', null, `第 ${app.selection.cycle || 1} 周目`),
+        (meta.cycle || 1) > 1 ? h('button', { class: 'seal small step', 'aria-label': '提高周目', disabled: (app.selection.cycle || 1) >= (meta.cycle || 1), onclick: () => a.pickCycle(1) }, '▶') : null,
+        h('span', null, ` 道果 ${meta.dao || 0}`)),
+      h('button', { class: 'seal small', onclick: a.openDao }, '道果加持')),
     h('div', { class: 'panel' },
       h('h2', null, '宗门'),
       h('div', { class: 'grid3' }, Object.values(SECTS).map((s) =>
@@ -3662,10 +3903,11 @@ function renderSelect(app, a) {
       h('div', { style: 'margin:6px 0 2px' }, rootLabel(root.rootId, root.quality), ' ', h('span', { class: 'tag' }, `${rootData.element}属性`)),
       h('p', { class: 'muted' }, describeRoot(rootData, root.quality) || '无属性加成'),
       synergyHint,
-      h('p', { class: 'muted', style: 'margin-top:2px' }, `品质决定加成强弱（杂 < 普 < 优 < 天）。已刷新 ${rerolls} 次，可以一直刷到满意。`),
+      h('p', { class: 'muted', style: 'margin-top:2px' }, `品质：杂 < 普 < 优 < 天。已刷新 ${rerolls} 次，可无限刷新。`),
     ),
     app.notice ? h('p', { class: 'notice', role: 'status' }, app.notice) : null,
     h('div', { class: 'grow' }),
+    h('p', { class: 'tip', role: 'note' }, '💡 无痕/隐私模式下关闭页面进度会消失；换设备或清除数据前，请在「☰ 菜单」导出存档码。'),
     h('button', { class: 'seal primary block', disabled: !sectId, onclick: a.begin }, sectId ? '入道' : '请先选择宗门'),
   );
 }
@@ -3677,14 +3919,13 @@ function renderExplore(app, a) {
   const sect = SECTS[p.sectId];
   const band = bandAt(run.depth);
   const gate = atGate(run); // 站在区域尽头：要击败首领才能继续
-  const speeds = ['1×', '3×', '10×'];
   return h('section', { class: 'screen' },
     topbar(a, { bag: true }),
     h('div', { class: 'panel' },
       h('div', { class: 'row spread' },
         h('div', { class: 'status-title' }, `${sect.icon} ${sect.name} · `, rootLabel(p.rootId, p.rootQuality || 'pu')),
         h('span', { class: 'tag realm' }, realmName(p.realm, p.stage))),
-      h('p', { class: 'muted', style: 'margin:2px 0 4px' }, `${band.name} · 第 ${fmt(run.depth)} 层 · 已斩 ${fmt(run.kills)} 只`),
+      h('p', { class: 'muted', style: 'margin:2px 0 4px' }, `${(run.cycle || 1) > 1 ? `第 ${run.cycle} 周目 · ` : ''}${band.name} · 第 ${fmt(run.depth)} 层 · 已斩 ${fmt(run.kills)} 只`),
       meter('生命', p.hp, p.stats.maxHp, 'hp'),
       meter('灵力', p.mp, p.stats.maxMp, 'mp'),
       h('div', { class: 'muted' }, `攻 ${fmt(p.stats.atk)} · 防 ${fmt(p.stats.def)} · 身法 ${p.stats.spd} · 暴击 ${Math.round(p.stats.crit * 1000) / 10}% · `, h('span', { class: 'gold' }, `💰 ${fmt(p.gold)}`)),
@@ -3698,22 +3939,21 @@ function renderExplore(app, a) {
           : h('span', { class: 'muted' }, '未装备，点 🎒 装备')),
       h('div', { class: 'muted', style: 'margin-top:4px' }, `擅长${TAGS[sect.affinity]} · 独门「${sect.passive.name}」（详情见 🎒 宗门）`),
     ),
-    h('div', { class: 'row' },
+    h('div', { class: 'row pill-row' },
       h('span', { class: 'muted' }, '丹药'),
       Object.entries(p.items).map(([id, n]) =>
-        h('button', { class: 'seal small', disabled: n <= 0, title: ITEMS[id].desc, 'aria-label': `${ITEMS[id].name}，${ITEMS[id].desc}，剩 ${n} 颗`, onclick: () => a.useItemOutside(id) }, `${ITEMS[id].name} ×${n}`))),
+        h('button', { class: 'seal small', disabled: n <= 0, title: ITEMS[id].desc, 'aria-label': `${ITEMS[id].name}，${ITEMS[id].desc}，剩 ${n} 颗`, onclick: () => a.useItemOutside(id) }, `${ITEMS[id].name} ×${n}`)),
+      pillAuto(app, a)),
     app.notice ? h('p', { class: 'notice', role: 'status' }, rich(app.notice)) : null,
     h('div', { class: 'log', role: 'log', 'aria-live': 'polite', 'aria-label': '历练记录' },
       (run.journal || []).length
         ? run.journal.map((l) => h('div', { class: `ln ${l.kind || ''} ${l.crit ? 'crit' : ''}` }, rich(l.text)))
         : h('div', { class: 'ln info' }, '还没有历练记录，点「历练」出发。')),
-    h('div', { class: 'row' },
-      h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关'),
-      h('button', { class: 'seal small', 'aria-label': '自动历练倍速', onclick: a.cycleSpeed }, `速度 ${speeds[app.speed]}`),
-      (p.keys > 0 || (run.demon && run.demon.inside)) ? h('button', { class: 'seal small', onclick: a.openDemon }, `🗝 魔界 ×${p.keys || 0}`) : null),
+    (p.keys > 0 || (run.demon && run.demon.inside)) ? h('button', { class: 'seal small block', onclick: a.openDemon }, `🗝 魔界 ×${p.keys || 0}`) : null,
     gate
       ? h('button', { class: 'seal primary block', onclick: a.breakthrough }, `突破 ${REALMS[p.realm]} → ${REALMS[p.realm + 1]}（挑战${BOSS.names[p.realm]}）`)
       : h('button', { class: 'seal primary block', onclick: a.explore }, '历练'),
+    autoBar(app, a),
   );
 }
 
@@ -3793,16 +4033,10 @@ function renderBattle(app, a) {
             class: 'seal', disabled: manualLocked, title: ITEMS[s.itemId].desc,
             onclick: () => a.act({ type: 'item', itemId: s.itemId }),
           }, ITEMS[s.itemId].name, h('span', { class: 'cost' }, `×${s.count}`))),
+          pillAuto(app, a),
         ),
-        h('div', { class: 'row' },
-          h('button', { class: `seal small grow-btn ${app.auto ? 'on' : ''}`, 'aria-pressed': String(app.auto), onclick: a.toggleAuto }, app.auto ? '自动战斗：开' : '自动战斗：关'),
-          !b.enemy.isTrial ? h('button', { class: `seal small grow-btn ${app.autoExplore ? 'on' : ''}`, 'aria-pressed': String(app.autoExplore), onclick: a.toggleAutoExplore }, app.autoExplore ? '自动历练：开' : '自动历练：关') : null),
-        h('div', { class: 'row spread' },
-          h('label', { class: 'muted' }, '生命低于 ',
-            h('select', { 'aria-label': '自动吃丹药的生命阈值', onchange: (ev) => a.setPillThreshold(Number(ev.target.value)) },
-              [[0, '不吃丹'], [0.3, '30%'], [0.5, '50%']].map(([v, t]) => h('option', { value: String(v), selected: app.autoConfig.pillHpThreshold === v }, t))),
-            ' 时自动吃回春丹')),
       ],
+    autoBar(app, a, { trial: b.enemy.isTrial }),
   );
 }
 
@@ -3858,7 +4092,7 @@ const HELP = [
       '每点一次「历练」前进一层：可能遇到妖兽、魔修、行商，或找到营地休息回血。',
       '战斗是回合制，打赢继续历练；生命归零则身死道消，需要重新入道。',
       '探索界面中间的「历练记录」会保留最近的战斗过程、奖励、营地休息和购买记录，方便回看。',
-      '进度自动保存在本机浏览器，换设备请用菜单里的「导出存档」。',
+      '进度自动保存在本机浏览器，换设备请用菜单里的「导出存档」。无痕/隐私模式下关闭页面后进度会消失，请用普通模式游玩。',
     ],
   },
   {
@@ -3880,9 +4114,17 @@ const HELP = [
     ],
   },
   {
+    title: '道果与轮回',
+    lines: [
+      '身死道消时，按你走到的层数获得「道果」。道果在「道果加持」里花掉：道体（生命、防御）、神通（攻击）、财运（金币）、行囊（开局物资），以及解锁变异灵根。加持永久有效，从下一世开始起作用。',
+      '打败天道代行者通关后，可以继续修行，也可以在结局或菜单里选「轮回转世」：结束这一世，获得更多道果，并进入下一周目。',
+      '每升一个周目，所有敌人的生命、攻击和防御都会增强一截，后期敌人本身也涨得更快。道果加得越多越能跟上；如果太难，可以在入道界面把周目调低再玩，周目越高获得的道果也越多。',
+    ],
+  },
+  {
     title: '自动历练',
     lines: [
-      '点「自动历练」后会自动前进、自动战斗、自动吃药，适合长时间挂机。「速度」可以切换 1×、3×、10×。',
+      '点屏幕最下面的「自动历练」后会自动前进、自动战斗、自动吃药，适合长时间挂机；「自动战斗」只自动打当前这一场。自动吃药的血量线在丹药旁边设置。',
       '遇到行商、走到区域尽头要挑战首领、或生命过低又没有回春丹时，会自动暂停，等你处理。',
       '行走也会慢慢恢复生命和灵力，战斗胜利后恢复得更多，营地休息最多。',
     ],
