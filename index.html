@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <meta name="xiantu-build" content="b53eb35431">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="color-scheme" content="light dark">
   <title>仙途轮回</title>
@@ -598,6 +599,9 @@ body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent
 .seal.pill.r-mythic { color: var(--r-mythic); border-color: color-mix(in srgb, var(--r-mythic) 85%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--r-mythic) 50%, transparent); }
 .seal.pill.r-common { color: var(--r-common); border-color: color-mix(in srgb, var(--r-common) 55%, transparent); }
 
+/* 新版本提示条：固定在屏幕最上方 */
+.update-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 70; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; font: inherit; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(180deg, #d9533f, #b8362a); border: 0; border-bottom: 2px solid rgba(255, 255, 255, 0.35); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); cursor: pointer; }
+
 </style>
 </head>
 <body>
@@ -615,6 +619,7 @@ const { FAVICON } = __req("data/art.js");
 const { resolveCave, pickThiefKind, createSwindle, resolveSwindle, thiefEncounter, npcOf, merchantLoyalty } = __req("engine/events.js");
 const { BATTLE_TICK_MS, EXPLORE_TICK_MS } = __req("data/pace.js");
 const { popsFromLog } = __req("ui/pops.js");
+const { BUILD_ID, fetchServerBuild, applyUpdate } = __req("update.js");
 const { entryLine, killLine, pickLine, BAND_REST, BAND_TREASURE, SWINDLER_TEXT, fill, merchantFarewell } = __req("data/flavor.js");
 const { recordKill, recordDrop, bump, checkAchievements } = __req("engine/achievements.js");
 const { makeHeirloom, heirloomCandidates } = __req("engine/heirloom.js");
@@ -692,6 +697,7 @@ const app = {
   sellPick: ['common', 'uncommon'], // 一键出售勾选的品质
   toasts: [], // 屏幕上方的短暂提示（稀有掉落、成就、被偷……）
   pops: [], // 战斗飘字（伤害、治疗数字）
+  update: null, // 线上的新版本号（有值说明有新版本，屏幕上会出现更新条）
   notice: loaded.error
     ? `存档读取失败：${loaded.error}。原存档没有被覆盖，你可以先导出它再开始新修行。`
     : storage.volatile ? '当前浏览器禁止本地存储，进度不会保留，请先导出存档码。' : '',
@@ -1107,6 +1113,17 @@ const actions = {
     commit();
   },
 
+  // 版本更新：线上有新版本就提示，点一下更新（存档不受影响）
+  applyUpdate() { applyUpdate(app.update); },
+  async checkUpdate() {
+    if (!BUILD_ID) { toast('这是开发版，没有版本检查', 'achv'); render(); return; }
+    let b = null;
+    try { b = await fetchServerBuild(); } catch (e) { /* 离线 */ }
+    if (!b) { toast('检查失败，请确认网络后再试', 'bad'); render(); return; }
+    if (b === BUILD_ID) { toast('✅ 已经是最新版本', 'achv'); render(); return; }
+    app.update = b;
+    applyUpdate(b);
+  },
   // 丹药选择窗：打开、服用（战斗中服用算一个回合）
   openPills(kind, ctx) { app.dialog = { type: 'pills', kind, ctx }; render(); },
   usePill(id) {
@@ -1376,6 +1393,19 @@ const actions = {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && app.dialog) actions.closeDialog();
 });
+
+// 静默检查有没有新版本：打开游戏 1.5 秒后一次，之后每次从后台回到游戏（间隔至少 30 秒）一次
+let lastCheck = 0;
+async function silentCheck() {
+  if (!BUILD_ID || Date.now() - lastCheck < 30000) return;
+  lastCheck = Date.now();
+  try {
+    const b = await fetchServerBuild();
+    if (b && b !== BUILD_ID && app.update !== b) { app.update = b; render(); }
+  } catch (e) { /* 离线就算了 */ }
+}
+setTimeout(silentCheck, 1500);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') silentCheck(); });
 
 // iOS 的双指缩放手势（gesturestart）也禁掉，避免误触把页面放大
 for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault());
@@ -3311,6 +3341,36 @@ function popsFromLog(entries) {
 
 return { POP_LIFE_MS, POP_BEAT_MS, popsFromLog };
 },
+"update.js": function () {
+// 版本检查：iOS 的「添加到主屏幕」会把旧网页缓存很久，所以游戏自己去问服务器现在是哪个版本，不一样就提示更新
+// 构建时 tools/build.js 会在 index.html 的开头写入 <meta name="xiantu-build" content="版本号">（内容的哈希，内容不变版本号就不变）
+const parseBuildId = (text) => {
+  const m = /name="xiantu-build"\s+content="([^"]+)"/.exec(String(text || ''));
+  return m ? m[1] : null;
+};
+
+// 当前正在运行的版本号（开发时没有打包，返回 null，不做检查）
+const currentBuild = (doc = typeof document !== 'undefined' ? document : null) => {
+  const el = doc && doc.querySelector && doc.querySelector('meta[name="xiantu-build"]');
+  return el ? el.getAttribute('content') : null;
+};
+const BUILD_ID = currentBuild();
+
+// 向服务器要页面最前面的 4KB（版本号写在 <head> 里），不用把整个页面再下载一遍。加时间戳和 no-store 绕开缓存
+async function fetchServerBuild(fetchFn = globalThis.fetch, base = typeof location !== 'undefined' ? location.pathname : '/') {
+  const res = await fetchFn(`${base}${base.includes('?') ? '&' : '?'}chk=${Date.now()}`, { cache: 'no-store', headers: { Range: 'bytes=0-4095' } });
+  return parseBuildId(await res.text());
+}
+
+// 更新：先把基础网址的缓存刷新成最新，再带版本号跳转，确保拿到新页面（存档存在浏览器本地，不受影响）
+async function applyUpdate(build, loc = globalThis.location, fetchFn = globalThis.fetch) {
+  const base = loc.pathname;
+  try { await fetchFn(base, { cache: 'reload' }); } catch (e) { /* 网络不好也继续，带版本号的网址一样会拉新页面 */ }
+  loc.replace(`${base}?v=${build || Date.now()}`);
+}
+
+return { parseBuildId, currentBuild, BUILD_ID, fetchServerBuild, applyUpdate };
+},
 "engine/achievements.js": function () {
 // 永久统计与成就：每次击杀、掉落、奇遇都记进 meta.stats，成就达成立刻发放道果
 const { ACHIEVEMENTS } = __req("data/achievements.js");
@@ -4841,6 +4901,7 @@ const { SWINDLER_TEXT, fill } = __req("data/flavor.js");
 const { heirloomCandidates, HEIRLOOM_BONUS } = __req("engine/heirloom.js");
 const { stats: metaStats } = __req("engine/achievements.js");
 const { POP_LIFE_MS } = __req("ui/pops.js");
+const { BUILD_ID } = __req("update.js");
 const { equipSellPrice, bookSellPrice, sellPrice } = __req("engine/inventory.js");
 const { pillPrice } = __req("engine/loot.js");
 const { canSummon, trialCleared } = __req("engine/demon.js");
@@ -5029,7 +5090,7 @@ function modal(app, a) {
     const sponsorUrl = /^https:\/\//.test(SPONSOR.url) ? SPONSOR.url : '';
     body = [
       h('h2', null, '关于 / 作者名单'),
-      h('p', null, h('b', null, GAME_NAME), ` v${VERSION}`, h('span', { class: 'muted' }, `（存档版本 ${SAVE_VERSION}）`)),
+      h('p', null, h('b', null, GAME_NAME), ` v${VERSION}`, h('span', { class: 'muted' }, `（存档版本 ${SAVE_VERSION}${BUILD_ID ? `，构建 ${BUILD_ID}` : ''}）`)),
       AUTHOR ? h('p', null, h('b', null, '作者：'), AUTHOR) : null,
       CREDITS.map((sec) => [h('h3', null, sec.title), sec.lines.map((l) => h('p', null, l))]),
       sponsorUrl
@@ -5164,6 +5225,7 @@ function modal(app, a) {
       h('div', { class: 'menu-list' },
         h('button', { class: 'seal', onclick: a.openHelp }, '玩法说明'),
         h('button', { class: 'seal', onclick: a.openAbout }, '关于 / 作者名单'),
+        h('button', { class: 'seal', onclick: a.checkUpdate }, '检查更新'),
         h('button', { class: 'seal', onclick: a.openExport }, '导出存档码'),
         h('button', { class: 'seal', onclick: a.openImport }, '导入存档码'),
         h('button', { class: 'seal', onclick: a.openAchievements }, `成就 ${(app.save.meta.achievements || []).length}/${ACHIEVEMENTS.length}`),
@@ -5501,7 +5563,8 @@ function renderApp(app, a) {
   else if (app.screen === 'demon' && app.save.run) screen = renderDemon(app, a);
   else if (app.screen === 'explore' && app.save.run) screen = renderExplore(app, a);
   else screen = renderSelect(app, a);
-  return h('div', { class: 'shell' }, screen, modal(app, a), toastLayer(app));
+  const bar = app.update ? h('button', { class: 'update-bar', onclick: a.applyUpdate }, '🔄 发现新版本，点这里更新（存档不受影响）') : null;
+  return h('div', { class: 'shell' }, bar, screen, modal(app, a), toastLayer(app));
 }
 
 return { rootLabel, renderSelect, renderExplore, renderShop, renderBattle, renderDemon, renderApp };
