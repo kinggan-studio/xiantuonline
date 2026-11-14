@@ -562,13 +562,14 @@ body.has-art .log { background: color-mix(in srgb, var(--paper) 90%, transparent
 .log-wrap { position: relative; flex: 1 1 80px; min-height: 72px; display: flex; flex-direction: column; }
 .log-wrap > .log { flex: 1 1 auto; min-height: 0; }
 .pop-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
-.pop { position: absolute; transform: translateX(-50%); font-weight: 900; font-size: 56px; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; -webkit-text-stroke: 2.5px rgba(0, 0, 0, 0.6); paint-order: stroke fill; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); animation: popfloat 1s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
-.pop.on-enemy { top: 8%; }
-.pop.on-player { top: 52%; }
+.pop { position: absolute; transform: translateX(-50%); font-weight: 900; font-size: 56px; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; -webkit-text-stroke: 2.5px rgba(0, 0, 0, 0.6); paint-order: stroke fill; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); animation: popfloat 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+/* 怪物受伤飘在中上；玩家受伤贴着战斗区的底部，紧挨着下面的玩家状态栏 */
+.pop.on-enemy { top: 4%; }
+.pop.on-player { bottom: 2%; }
 .pop.dmg { color: #ff5a46; }
 .pop.heal { color: #6fd9a6; }
 .pop.crit { color: #ffd24a; font-size: 72px; text-shadow: 0 0 14px rgba(255, 190, 60, 0.9), 0 2px 8px rgba(0, 0, 0, 0.6); }
-@keyframes popfloat { 0% { opacity: 0; margin-top: 14px; scale: 0.5; } 12% { opacity: 1; margin-top: -4px; scale: 1.35; } 30% { margin-top: -16px; scale: 1; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -64px; scale: 1; } }
+@keyframes popfloat { 0% { opacity: 0; translate: 0 16px; scale: 0.5; } 14% { opacity: 1; translate: 0 -2px; scale: 1.3; } 35% { translate: 0 -14px; scale: 1; } 70% { opacity: 1; } 100% { opacity: 0; translate: 0 -56px; scale: 1; } }
 
 </style>
 </head>
@@ -595,7 +596,7 @@ const { MONSTERS } = __req("data/monsters.js");
 const { createNewRun, createEnemy, resetForBattle, recoverAfterBattle, walkRegen, restAtCamp, rollRoot, appendJournal, recomputePlayer } = __req("engine/state.js");
 const { pickEvent, pickMonster } = __req("engine/scheduler.js");
 const { loadGame, saveGame, clearRun, exportCode, importCode } = __req("engine/save.js");
-const { equipItem, unequipItem, toggleLoadout, studyBook, sellEquipment, sellJunk, sellBook, sellLearnedSkill, sellPill } = __req("engine/inventory.js");
+const { equipItem, unequipItem, toggleLoadout, studyBook, sellEquipment, sellJunk, sellBook, sellPill } = __req("engine/inventory.js");
 const { pillPrice } = __req("engine/loot.js");
 const { rollRewards, rollChest, applyRewards } = __req("engine/rewards.js");
 const { generateShop, buyFromShop } = __req("engine/shop.js");
@@ -1029,17 +1030,14 @@ const actions = {
     commit();
   },
   setShopTab(tab) { app.shopTab = tab; app.shopMsg = ''; render(); },
-  // 出售：装备、秘籍、已学会的武学、丹药，价格都低于买价
+  // 出售：装备、秘籍、丹药，价格都低于买价（已学会的武学不能卖）
   sell(kind, id) {
     const run = app.save.run;
     const p = run.player;
     let r;
     if (kind === 'equip') r = sellEquipment(p, id);
     else if (kind === 'book') r = sellBook(p, id);
-    else if (kind === 'skill') {
-      if (!window.confirm(`确定遗忘并卖掉已学会的武学「${SKILLS[id].name}」吗？它的等级也会一起清零。`)) return;
-      r = sellLearnedSkill(p, id);
-    } else r = sellPill(p, id, pillPrice(ITEMS[id], p.realm || 0));
+    else r = sellPill(p, id, pillPrice(ITEMS[id], p.realm || 0));
     app.shopMsg = r.msg;
     if (r.ok) { if (run.shopVisit) run.shopVisit.sold += 1; appendJournal(run, [{ text: `${r.msg}`, kind: 'gold' }]); }
     commit();
@@ -2491,8 +2489,6 @@ function studyBook(p, skillId) {
 const sellPrice = (base) => Math.max(1, Math.round(base * SHOP_SELL_RATE));
 const equipSellPrice = (item) => sellPrice(item.price);
 const bookSellPrice = (p, skillId) => sellPrice(SKILLS[skillId].price * growth(p.realm || 0));
-// 已学会的武学：按等级折算（每一级相当于一本秘籍）
-const skillSellPrice = (p, skillId) => bookSellPrice(p, skillId) * skillLevel(p, skillId);
 
 function sellEquipment(p, uid) {
   const i = p.bag.equipment.findIndex((it) => it.uid === uid);
@@ -2523,18 +2519,6 @@ function sellBook(p, skillId) {
   return { ok: true, gold, msg: `卖出《${SKILLS[skillId].name}》秘籍，得 ${gold} 元宝` };
 }
 
-// 卖掉已学会的武学（相当于遗忘）。至少要留一门，否则没法战斗
-function sellLearnedSkill(p, skillId) {
-  if (!p.learned.includes(skillId)) return { ok: false, msg: '你没有学会这门武学' };
-  if (p.learned.length <= 1) return { ok: false, msg: '至少要留一门武学' };
-  const gold = skillSellPrice(p, skillId);
-  p.learned = p.learned.filter((x) => x !== skillId);
-  p.skills = p.skills.filter((x) => x !== skillId);
-  delete p.skillLevels[skillId];
-  p.gold += gold;
-  return { ok: true, gold, msg: `遗忘并卖出「${SKILLS[skillId].name}」，得 ${gold} 元宝` };
-}
-
 function sellPill(p, itemId, itemPrice) {
   if (!((p.items[itemId] || 0) > 0)) return { ok: false, msg: '没有这种丹药了' };
   const gold = sellPrice(itemPrice);
@@ -2543,7 +2527,7 @@ function sellPill(p, itemId, itemPrice) {
   return { ok: true, gold, msg: `卖出一颗丹药，得 ${gold} 元宝` };
 }
 
-return { skillLevel, bagFull, addToBag, equipItem, unequipItem, toggleLoadout, learnSkill, describeLearn, bookCount, totalBooks, addBook, studyBook, sellPrice, equipSellPrice, bookSellPrice, skillSellPrice, sellEquipment, sellJunk, sellBook, sellLearnedSkill, sellPill };
+return { skillLevel, bagFull, addToBag, equipItem, unequipItem, toggleLoadout, learnSkill, describeLearn, bookCount, totalBooks, addBook, studyBook, sellPrice, equipSellPrice, bookSellPrice, sellEquipment, sellJunk, sellBook, sellPill };
 },
 "engine/state.js": function () {
 const { SECTS } = __req("data/sects.js");
@@ -3215,7 +3199,7 @@ return { BATTLE_TICK_MS, EXPLORE_TICK_MS };
 "ui/pops.js": function () {
 // 战斗飘字：从新增的战斗日志里取出伤害和治疗数值，在对应的头像/面板上飘起来
 // 同一回合里的多个数字错开出现（玩家出手 → 敌人还击），形成一拍一拍的节奏
-const POP_LIFE_MS = 950;
+const POP_LIFE_MS = 800;
 const POP_BEAT_MS = 150;
 
 function popsFromLog(entries) {
@@ -4752,7 +4736,7 @@ const { SWINDLER_TEXT, fill } = __req("data/flavor.js");
 const { heirloomCandidates, HEIRLOOM_BONUS } = __req("engine/heirloom.js");
 const { stats: metaStats } = __req("engine/achievements.js");
 const { POP_LIFE_MS } = __req("ui/pops.js");
-const { equipSellPrice, bookSellPrice, skillSellPrice, sellPrice } = __req("engine/inventory.js");
+const { equipSellPrice, bookSellPrice, sellPrice } = __req("engine/inventory.js");
 const { pillPrice } = __req("engine/loot.js");
 const { canSummon, trialCleared } = __req("engine/demon.js");
 const { splitRarity } = __req("ui/richtext.js");
@@ -5234,7 +5218,7 @@ function renderShop(app, a) {
         'aria-label': `购买${shopEntryName(e)}，${e.price} 元宝`, onclick: () => a.buy(i),
       }, e.sold ? '已售' : maxed ? '满级' : price(e.price)));
   }));
-  // 出售：行囊里的装备、秘籍、已学会的武学、丹药
+  // 出售：行囊里的装备、秘籍、丹药（已学会的武学不能卖）
   const gear = [...p.bag.equipment].sort(byRarity);
   const pickCount = gear.filter((e) => app.sellPick.includes(e.rarity)).length;
   const pickGold = gear.filter((e) => app.sellPick.includes(e.rarity)).reduce((sum, e) => sum + equipSellPrice(e), 0);
@@ -5259,11 +5243,9 @@ function renderShop(app, a) {
     gear.map((e) => sellRow(h('span', null, itemName(e), ' ', compareTag(p, e)), equipLine(e), equipSellPrice(e), () => a.sell('equip', e.uid), `卖出${e.name}`)),
     books.length ? h('h3', null, '武学秘籍') : null,
     books.map(([id, n]) => sellRow(`📜 《${SKILLS[id].name}》秘籍 ×${n}`, p.learned.includes(id) ? `已学 Lv.${levelOf(p, id)}` : '未学会', bookSellPrice(p, id), () => a.sell('book', id), `卖出${SKILLS[id].name}秘籍`)),
-    p.learned.length > 1 ? h('h3', null, '已学武学（卖掉等于遗忘）') : null,
-    p.learned.length > 1 ? p.learned.map((id) => sellRow(`${SKILLS[id].name} Lv.${levelOf(p, id)}`, p.skills.includes(id) ? '已装备' : '未装备', skillSellPrice(p, id), () => a.sell('skill', id), `遗忘并卖出${SKILLS[id].name}`)) : null,
     Object.entries(p.items).some(([, n]) => n > 0) ? h('h3', null, '丹药') : null,
     Object.entries(p.items).filter(([, n]) => n > 0).map(([id, n]) => sellRow(`💊 ${ITEMS[id].name} ×${n}`, ITEMS[id].desc, sellPrice(pillPrice(ITEMS[id], p.realm || 0)), () => a.sell('pill', id), `卖出${ITEMS[id].name}`)),
-    !gear.length && !books.length && p.learned.length <= 1 && !Object.values(p.items).some((n) => n > 0) ? h('p', { class: 'muted' }, '你身上没有可卖的东西。') : null);
+    !gear.length && !books.length && !Object.values(p.items).some((n) => n > 0) ? h('p', { class: 'muted' }, '你身上没有可卖的东西。') : null);
   return h('section', { class: 'screen' },
     h('header', { class: 'topbar' },
       h('h1', { class: 'brand' }, '行商'),
@@ -5282,7 +5264,7 @@ function popOverlay(app) {
   const mine = (app.pops || []).filter((q) => now - q.t0 < POP_LIFE_MS + 400);
   if (!mine.length) return null;
   return h('div', { class: 'pop-overlay', 'aria-hidden': 'true' }, mine.map((q) =>
-    h('span', { class: `pop on-${q.on} ${q.kind}${q.crit ? ' crit' : ''}`, style: `left:${28 + ((q.id * 37) % 44)}%;animation-delay:${q.delay - (now - q.t0)}ms` }, q.crit ? `暴击 ${q.text}` : q.text)));
+    h('span', { class: `pop on-${q.on} ${q.kind}${q.crit ? ' crit' : ''}`, style: `left:${14 + ((q.id * 53) % 72)}%;animation-delay:${q.delay - (now - q.t0)}ms` }, q.crit ? `暴击 ${q.text}` : q.text)));
 }
 
 function renderBattle(app, a) {
@@ -5460,7 +5442,7 @@ const HELP = [
       '历练时有几率遇到行商，也可能发现宝箱。宝箱会随机开出元宝、装备、武学或药品。',
       '行商每次带的货都不一样：3 件随机装备、2 门武学、限量药品。刷新页面不会重新刷货。价格偏高，需要攒钱；丹修、商修有 9 折。',
       '价格随你的境界上涨，同时你的元宝收入也随境界增加。',
-      '行商也收购东西：切到「出售」页，可以卖行囊里的装备、武学秘籍、已学会的武学（卖掉等于遗忘，至少要留一门）和丹药。收购价是原价的 40%，比买价低不少；还有「一键卖白/绿装备」。穿在身上的装备要先卸下才能卖。行囊装满时，新装备会自动按 35% 折算成元宝。',
+      '行商也收购东西：切到「出售」页，可以卖行囊里的装备、武学秘籍和丹药（已学会的武学不能卖）。收购价是原价的 40%，比买价低不少；还有「一键卖白/绿装备」。穿在身上的装备要先卸下才能卖。行囊装满时，新装备会自动按 35% 折算成元宝。',
     ],
   },
   {
